@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lector QR Secuencial Móvil</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 15px;
+            text-align: center;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        #camara-contenedor {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1 / 1;
+            margin: 15px auto;
+            border: 3px solid #0d6efd;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            position: relative;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .info-secuencia {
+            font-size: 1.3rem;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        #numero-esperado {
+            color: #0d6efd;
+            font-size: 1.8rem;
+        }
+        .controles {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button.btn-peligro { background-color: #dc3545; }
+        select {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+            text-align: center;
+        }
+        th { background-color: #212529; color: white; }
+        .valido { color: #198754; font-weight: bold; }
+        .invalido { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <p>Escáner QR en Tiempo Real</p>
+    <h1>Lector QR Secuencial</h1>
+    
+    <div class="info-secuencia">
+        Siguiente esperado: <span id="numero-esperado">1</span>
+    </div>
+
+    <div class="controles">
+        <button id="btn-iniciar">Encender Cámara</button>
+        <select id="selector-camara" style="display:none;"></select>
+    </div>
+
+    <div id="camara-contenedor">
+        <video id="video-feed" autoplay playsinline muted></video>
+    </div>
+
+    <h2>Historial de Registros</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Hora</th>
+                <th>QR</th>
+                <th>Resultado</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-historial"></tbody>
+    </table>
+
+    <button id="btn-reiniciar" class="btn-peligro" style="margin-top:20px;">Reiniciar Todo</button>
+
+    <script>
+        let siguienteEsperado = 1;
+        let listaDispositivos = [];
+        let flujoActual = null;
+
+        const video = document.getElementById('video-feed');
+        const btnIniciar = document.getElementById('btn-iniciar');
+        const selectorCamara = document.getElementById('selector-camara');
+        const txtEsperado = document.getElementById('numero-esperado');
+        const tablaHistorial = document.getElementById('tabla-historial');
+        const btnReiniciar = document.getElementById('btn-reiniciar');
+
+        // Verificar soporte nativo de QR del sistema operativo/navegador
+        if (!('BarcodeDetector' in window)) {
+            alert('Tu navegador no soporta lectura nativa de QR. Asegúrate de usar Chrome, Edge o Safari actualizado y bajo una conexión HTTPS.');
+        }
+
+        const detectorCodigos = new BarcodeDetector({ formats: ['qr_code'] });
+
+        // Buscar cámaras disponibles en el móvil
+        async function obtenerCamaras() {
+            try {
+                const dispositivos = await navigator.mediaDevices.enumerateDevices();
+                listaDispositivos = dispositivos.filter(d => d.kind === 'videoinput');
+                
+                selectorCamara.innerHTML = '';
+                listaDispositivos.forEach((dispositivo, index) => {
+                    const opcion = document.createElement('option');
+                    opcion.value = dispositivo.deviceId;
+                    opcion.text = dispositivo.label || `Cámara ${index + 1}`;
+                    // Intentar preseleccionar la cámara trasera (generalmente contiene "environment" o "back")
+                    if (dispositivo.label.toLowerCase().includes('back') || dispositivo.label.toLowerCase().includes('trasera')) {
+                        opcion.selected = true;
+                    }
+                    selectorCamara.appendChild(opcion);
+                });
+
+                if (listaDispositivos.length > 1) {
+                    selectorCamara.style.display = 'inline-block';
+                }
+            } catch (e) {
+                console.error("Error enumerando cámaras:", e);
+            }
+        }
+
+        // Iniciar el flujo de video de la cámara seleccionada
+        async function arrancarCamara(deviceId = null) {
+            if (flujoActual) {
+                flujoActual.getTracks().forEach(track => track.stop());
+            }
+
+            const opcionesControles = deviceId 
+                ? { video: { deviceId: { exact: deviceId } } }
+                : { video: { facingMode: 'environment' } }; // 'environment' prioriza la cámara trasera
+
+            try {
+                flujoActual = await navigator.mediaDevices.getUserMedia(opcionesControles);
+                video.srcObject = flujoActual;
+                btnIniciar.style.display = 'none';
+                
+                // Actualizar lista de nombres de cámaras tras dar el permiso
+                await obtenerCamaras();
+                
+                // Empezar el ciclo de escaneo
+                escanearFotograma();
+            } catch (err) {
+                alert("Error al acceder a la cámara. Recuerda que DEBES usar HTTPS:// para que el teléfono te permita activar la cámara.");
+                console.error(err);
+            }
+        }
+
+        // Analizar el video frame por frame en tiempo real
+        async function escanearFotograma() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                try {
+                    const codigos = await detectorCodigos.detect(video);
+                    if (codigos.length > 0) {
+                        procesarQR(codigos[0].rawValue);
+                    }
+                } catch (e) {
+                    console.error("Error detectando código:", e);
+                }
+            }
+            // Mantiene el bucle activo de forma nativa y fluida
+            requestAnimationFrame(escanearFotograma);
+        }
+
+        let ultimoCodigoLeido = null;
+        let tiempoUltimoEscaneo = 0;
+
+        function procesarQR(textoQR) {
+            const ahoraTiempo = Date.now();
+            // Evitar lecturas duplicadas seguidas del mismo código en menos de 2 segundos
+            if (textoQR === ultimoCodigoLeido && (ahoraTiempo - tiempoUltimoEscaneo) < 2000) return;
+
+            ultimoCodigoLeido = textoQR;
+            tiempoUltimoEscaneo = ahoraTiempo;
+
+            const ahora = new Date();
+            const horaFormateada = ahora.toLocaleTimeString();
+            let resultadoTexto = "";
+            let claseResultado = "";
+
+            if (textoQR.trim() === String(siguienteEsperado)) {
+                resultadoTexto = "Válido";
+                claseResultado = "valido";
+                siguienteEsperado++;
+                txtEsperado.innerText = siguienteEsperado;
+            } else {
+                resultadoTexto = "Incorrecto";
+                claseResultado = "invalido";
+            }
+
+            const nuevaFila = document.createElement('tr');
+            nuevaFila.innerHTML = `
+                <td>${horaFormateada}</td>
+                <td>${textoQR}</td>
+                <td class="${claseResultado}">${resultadoTexto}</td>
+            `;
+            tablaHistorial.insertBefore(nuevaFila, tablaHistorial.firstChild);
+        }
+
+        // Eventos
+        btnIniciar.addEventListener('click', () => arrancarCamara(selectorCamara.value));
+        selectorCamara.addEventListener('change', () => arrancarCamara(selectorCamara.value));
+        
+        btnReiniciar.addEventListener('click', () => {
+            siguienteEsperado = 1;
+            txtEsperado.innerText = siguienteEsperado;
+            tablaHistorial.innerHTML = '';
+            ultimoCodigoLeido = null;
+        });
+    </script>
+</body>
+</html>
