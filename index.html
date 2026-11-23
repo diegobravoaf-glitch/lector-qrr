@@ -66,8 +66,22 @@
             box-shadow: 0 0 10px rgba(0,212,255,0.3);
         }
         video { width: 100%; height: 100%; object-fit: cover; }
-        .info-secuencia { font-size: 1.3rem; margin: 10px 0; font-weight: bold; color: #fff; }
-        #numero-esperado, #supervisor-esperado, #superadmin-esperado { color: #00d4ff; font-size: 1.8rem; }
+        .info-secuencia {
+            font-size: 1.15rem;
+            margin: 10px 0;
+            font-weight: bold;
+            color: #fff;
+            background: #1a1e23;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #2a2f35;
+        }
+        #numero-esperado, #supervisor-esperado, #superadmin-esperado {
+            display: block;
+            color: #00d4ff;
+            font-size: 1.45rem;
+            margin-top: 4px;
+        }
 
         .controles {
             margin: 15px 0;
@@ -98,7 +112,7 @@
             overflow: hidden;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        th, td { padding: 10px; border-bottom: 1px solid #3f454d; text-align: center; color: #e9ecef; }
+        th, td { padding: 10px; border-bottom: 1px solid #3f454d; text-align: center; color: #e9ecef; font-size: 0.92rem; }
         th { background-color: #1a1e23; color: white; }
         .valido { color: #2ecc71; font-weight: bold; }
         .invalido { color: #e74c3c; font-weight: bold; }
@@ -187,7 +201,7 @@
         <h1>Lector QR Secuencial</h1>
 
         <div class="info-secuencia">
-            Siguiente esperado: <span id="numero-esperado">1</span>
+            Siguiente punto esperado: <span id="numero-esperado">1/31: AZOTEA</span>
         </div>
 
         <div class="controles">
@@ -206,7 +220,7 @@
             <thead>
                 <tr>
                     <th>Hora</th>
-                    <th>QR</th>
+                    <th>Punto QR</th>
                     <th>Resultado</th>
                 </tr>
             </thead>
@@ -235,7 +249,7 @@
         <h2>Panel de Supervisión</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente QR: <span id="supervisor-esperado">1</span>
+            Recorrido en curso - Siguiente punto: <span id="supervisor-esperado">1/31: AZOTEA</span>
         </div>
 
         <div id="supervisor-mensaje-final"></div>
@@ -245,7 +259,7 @@
             <thead>
                 <tr>
                     <th>Hora</th>
-                    <th>QR</th>
+                    <th>Punto QR</th>
                     <th>Resultado</th>
                 </tr>
             </thead>
@@ -268,7 +282,7 @@
         <h2>Panel de Super Admin</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente QR: <span id="superadmin-esperado">1</span>
+            Recorrido en curso - Siguiente punto: <span id="superadmin-esperado">1/31: AZOTEA</span>
         </div>
 
         <div id="superadmin-mensaje-final"></div>
@@ -278,7 +292,7 @@
             <thead>
                 <tr>
                     <th>Hora</th>
-                    <th>QR</th>
+                    <th>Punto QR</th>
                     <th>Resultado</th>
                 </tr>
             </thead>
@@ -326,7 +340,50 @@
             "diego": { pass: "admin2026", rol: "superadmin" }
         };
 
-        const TOTAL_PUNTOS = 6;
+        // ================= SECUENCIA CRONOLÓGICA DE 31 PUNTOS =================
+        const PUNTOS_RECORRIDO = [
+            "AZOTEA",
+            "PISO PH",
+            "PISO 10",
+            "PISO 09",
+            "PISO 08",
+            "SERVIDORES TI",
+            "PISO 07",
+            "PISO 06",
+            "PISO 05",
+            "PISO 04",
+            "PISO 03",
+            "PISO 02",
+            "PISO 1",
+            "UDITORIO",
+            "CECON",
+            "FINANZAS",
+            "PB",
+            "CHILLER",
+            "COMEDOR PB",
+            "ATENCION AL CIDADANO",
+            "SUB SOTANO 04",
+            "SOTANO 04",
+            "SUB SOTANO 03",
+            "SUB SOTANO 02",
+            "SOTANO 01 ESCALERAS",
+            "SOTANO 01",
+            "RAMPA 02",
+            "CUARTO DE ESCOLTAS",
+            "SOTANO VIP",
+            "SOTANO 01 PLATA ELECTRICA",
+            "RAMPA 01"
+        ];
+
+        const TOTAL_PUNTOS = PUNTOS_RECORRIDO.length;
+
+        function formatearPuntoEsperado(paso) {
+            if (paso > TOTAL_PUNTOS) {
+                return "RECORRIDO COMPLETADO";
+            }
+            const indice = Math.max(0, paso - 1);
+            return `${paso}/${TOTAL_PUNTOS}: ${PUNTOS_RECORRIDO[indice]}`;
+        }
 
         function validarLogin() {
             const userIngresado = document.getElementById("username").value.trim();
@@ -366,363 +423,4 @@
             document.getElementById("password").value = "";
 
             document.getElementById("app-section").classList.add("hidden");
-            document.getElementById("supervisor-section").classList.add("hidden");
-            document.getElementById("superadmin-section").classList.add("hidden");
-            document.getElementById("login-section").classList.remove("hidden");
-        }
-
-        // ================= LÓGICA DEL OFICIAL =================
-        let siguienteEsperado = 1;
-        let listaDispositivos = [];
-        let flujoActual = null;
-        let huboErroresEnRecorrido = false;
-        let recorridoFinalizado = false;
-
-        const video = document.getElementById('video-feed');
-        const btnIniciar = document.getElementById('btn-iniciar');
-        const selectorCamara = document.getElementById('selector-camara');
-        const txtEsperado = document.getElementById('numero-esperado');
-        const tablaHistorial = document.getElementById('tabla-historial');
-        const btnReiniciar = document.getElementById('btn-reiniciar');
-        const btnFinalizar = document.getElementById('btn-finalizar');
-        const mensajeFinal = document.getElementById('mensaje-resultado-final');
-
-        const detectorCodigos = new BarcodeDetector({ formats: ['qr_code'] });
-
-        async function obtenerCamaras() {
-            try {
-                const dispositivos = await navigator.mediaDevices.enumerateDevices();
-                listaDispositivos = dispositivos.filter(d => d.kind === 'videoinput');
-                selectorCamara.innerHTML = '';
-                listaDispositivos.forEach((dispositivo, index) => {
-                    const opcion = document.createElement('option');
-                    opcion.value = dispositivo.deviceId;
-                    opcion.text = dispositivo.label || `Cámara ${index + 1}`;
-                    if (dispositivo.label.toLowerCase().includes('back') || dispositivo.label.toLowerCase().includes('trasera')) {
-                        opcion.selected = true;
-                    }
-                    selectorCamara.appendChild(opcion);
-                });
-                if (listaDispositivos.length > 1) selectorCamara.style.display = 'inline-block';
-            } catch (e) { console.error(e); }
-        }
-
-        async function arrancarCamara(deviceId = null) {
-            if (flujoActual) flujoActual.getTracks().forEach(track => track.stop());
-            const opcionesControles = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: 'environment' } };
-            try {
-                flujoActual = await navigator.mediaDevices.getUserMedia(opcionesControles);
-                video.srcObject = flujoActual;
-                btnIniciar.style.display = 'none';
-                await obtenerCamaras();
-                escanearFotograma();
-            } catch (err) { alert("Error al acceder a la cámara."); }
-        }
-
-        async function escanearFotograma() {
-            if (document.getElementById('app-section').classList.contains('hidden') || recorridoFinalizado) return;
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                try {
-                    const codigos = await detectorCodigos.detect(video);
-                    if (codigos.length > 0) procesarQR(codigos[0].rawValue);
-                } catch (e) {}
-            }
-            requestAnimationFrame(escanearFotograma);
-        }
-
-        let ultimoCodigoLeido = null;
-        let tiempoUltimoEscaneo = 0;
-
-        function procesarQR(textoQR) {
-            if (recorridoFinalizado) return;
-            const ahoraTiempo = Date.now();
-            if (textoQR === ultimoCodigoLeido && (ahoraTiempo - tiempoUltimoEscaneo) < 2000) return;
-
-            ultimoCodigoLeido = textoQR;
-            tiempoUltimoEscaneo = ahoraTiempo;
-
-            const horaFormateada = new Date().toLocaleTimeString();
-            let resultadoTexto = "";
-            let claseResultado = "";
-
-            if (siguienteEsperado <= TOTAL_PUNTOS && textoQR.trim() === String(siguienteEsperado)) {
-                resultadoTexto = "Válido";
-                claseResultado = "valido";
-
-                const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR, resultado: resultadoTexto, clase: claseResultado };
-
-                if (siguienteEsperado === TOTAL_PUNTOS) {
-                    recorridoFinalizado = true;
-                    db.ref('recorrido_activo/historial').once('value').then((snapshot) => {
-                        let historial = snapshot.val() || [];
-                        historial.unshift(nuevaFilaDatos);
-
-                        const estado = {
-                            esperado: siguienteEsperado,
-                            historial: historial,
-                            finalizado: true,
-                            errores: false
-                        };
-                        db.ref('recorrido_activo').set(estado);
-                        renderizarTablaOficial(historial);
-
-                        db.ref('recorridos_archivados').push({
-                            fecha: new Date().toLocaleString(),
-                            exitoso: true,
-                            historial: historial
-                        });
-                    });
-
-                    mensajeFinal.style.display = "block";
-                    mensajeFinal.className = "bg-exito";
-                    mensajeFinal.innerHTML = "✅ Bien: ¡Los 6 puntos del recorrido se completaron de forma perfecta!";
-                    return;
-                } else {
-                    siguienteEsperado++;
-                    txtEsperado.innerText = siguienteEsperado;
-                }
-            } else {
-                resultadoTexto = "Incorrecto";
-                claseResultado = "invalido";
-                huboErroresEnRecorrido = true;
-            }
-
-            const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR, resultado: resultadoTexto, clase: claseResultado };
-            sincronizarANube(nuevaFilaDatos);
-        }
-
-        function sincronizarANube(nuevaFila) {
-            db.ref('recorrido_activo/historial').once('value').then((snapshot) => {
-                let historial = snapshot.val() || [];
-                historial.unshift(nuevaFila);
-
-                const estado = {
-                    esperado: siguienteEsperado,
-                    historial: historial,
-                    finalizado: recorridoFinalizado,
-                    errores: huboErroresEnRecorrido
-                };
-
-                db.ref('recorrido_activo').set(estado);
-                renderizarTablaOficial(historial);
-            });
-        }
-
-        function renderizarTablaOficial(historial) {
-            tablaHistorial.innerHTML = '';
-            historial.forEach(item => {
-                const nuevaFila = document.createElement('tr');
-                nuevaFila.innerHTML = `<td>${item.hora}</td><td>${item.qr}</td><td class="${item.clase}">${item.resultado}</td>`;
-                tablaHistorial.appendChild(nuevaFila);
-            });
-        }
-
-        function completarYArchivarRecorrido(esExitoso) {
-            mensajeFinal.style.display = "block";
-            const fechaHora = new Date().toLocaleString();
-            const estadoExito = esExitoso && !huboErroresEnRecorrido;
-
-            if (estadoExito) {
-                mensajeFinal.className = "bg-exito";
-                mensajeFinal.innerHTML = "✅ Bien: ¡Los 6 puntos del recorrido se completaron de forma perfecta!";
-            } else {
-                mensajeFinal.className = "bg-error";
-                mensajeFinal.innerHTML = "❌ Negativo: El recorrido finalizó con errores o saltos de puntos.";
-            }
-
-            db.ref('recorrido_activo').once('value').then(snapshot => {
-                const datosActivos = snapshot.val();
-                if (datosActivos && datosActivos.historial && datosActivos.historial.length > 0) {
-                    db.ref('recorridos_archivados').push({
-                        fecha: fechaHora,
-                        exitoso: estadoExito,
-                        historial: datosActivos.historial
-                    });
-                }
-            });
-
-            db.ref('recorrido_activo').update({ finalizado: true, errores: huboErroresEnRecorrido });
-        }
-
-        function cargarEstadoNubeOficial() {
-            db.ref('recorrido_activo').on('value', (snapshot) => {
-                const estado = snapshot.val();
-                if (estado) {
-                    siguienteEsperado = estado.esperado || 1;
-                    recorridoFinalizado = estado.finalizado || false;
-                    huboErroresEnRecorrido = estado.errores || false;
-                    txtEsperado.innerText = siguienteEsperado;
-                    if (estado.historial) renderizarTablaOficial(estado.historial);
-
-                    if (recorridoFinalizado) {
-                        mensajeFinal.style.display = "block";
-                        mensajeFinal.className = huboErroresEnRecorrido ? "bg-error" : "bg-exito";
-                        mensajeFinal.innerHTML = huboErroresEnRecorrido ? "❌ Negativo: El recorrido finalizó con errores o saltos." : "✅ Bien: ¡Recorrido completado perfectamente!";
-                    }
-                }
-            });
-        }
-
-        btnFinalizar.addEventListener('click', () => {
-            if (recorridoFinalizado) return;
-            recorridoFinalizado = true;
-            const esPerfecto = (siguienteEsperado > TOTAL_PUNTOS && !huboErroresEnRecorrido);
-            completarYArchivarRecorrido(esPerfecto);
-        });
-
-        btnIniciar.addEventListener('click', () => arrancarCamara(selectorCamara.value));
-        selectorCamara.addEventListener('change', () => arrancarCamara(selectorCamara.value));
-
-        btnReiniciar.addEventListener('click', () => {
-            db.ref('recorrido_activo').remove();
-            siguienteEsperado = 1;
-            huboErroresEnRecorrido = false;
-            recorridoFinalizado = false;
-            txtEsperado.innerText = siguienteEsperado;
-            tablaHistorial.innerHTML = '';
-            ultimoCodigoLeido = null;
-            mensajeFinal.style.display = "none";
-        });
-
-        // ================= LÓGICA DE SUPERVISORES =================
-        function iniciarMonitoreoSupervisor() {
-            db.ref('recorrido_activo').on('value', (snapshot) => {
-                if (document.getElementById('supervisor-section').classList.contains('hidden')) return;
-                const estado = snapshot.val();
-                if (!estado) {
-                    document.getElementById('supervisor-esperado').innerText = "1";
-                    document.getElementById('supervisor-tabla-historial').innerHTML = "";
-                    document.getElementById('supervisor-mensaje-final').style.display = "none";
-                    return;
-                }
-
-                document.getElementById('supervisor-esperado').innerText = estado.esperado || 1;
-                const supTabla = document.getElementById('supervisor-tabla-historial');
-                supTabla.innerHTML = '';
-                if (estado.historial) {
-                    estado.historial.forEach(item => {
-                        const fila = document.createElement('tr');
-                        fila.innerHTML = `<td>${item.hora}</td><td>${item.qr}</td><td class="${item.clase}">${item.resultado}</td>`;
-                        supTabla.appendChild(fila);
-                    });
-                }
-
-                const supMensajeFinal = document.getElementById('supervisor-mensaje-final');
-                if (estado.finalizado) {
-                    supMensajeFinal.style.display = "block";
-                    supMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    supMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
-                } else {
-                    supMensajeFinal.style.display = "none";
-                }
-            });
-        }
-
-        // ================= LÓGICA DE SUPER ADMIN =================
-        function iniciarMonitoreoSuperAdmin() {
-            db.ref('recorrido_activo').on('value', (snapshot) => {
-                if (document.getElementById('superadmin-section').classList.contains('hidden')) return;
-                const estado = snapshot.val();
-                if (!estado) {
-                    document.getElementById('superadmin-esperado').innerText = "1";
-                    document.getElementById('superadmin-tabla-historial').innerHTML = "";
-                    document.getElementById('superadmin-mensaje-final').style.display = "none";
-                    return;
-                }
-
-                document.getElementById('superadmin-esperado').innerText = estado.esperado || 1;
-                const saTabla = document.getElementById('superadmin-tabla-historial');
-                saTabla.innerHTML = '';
-                if (estado.historial) {
-                    estado.historial.forEach(item => {
-                        const fila = document.createElement('tr');
-                        fila.innerHTML = `<td>${item.hora}</td><td>${item.qr}</td><td class="${item.clase}">${item.resultado}</td>`;
-                        saTabla.appendChild(fila);
-                    });
-                }
-
-                const saMensajeFinal = document.getElementById('superadmin-mensaje-final');
-                if (estado.finalizado) {
-                    saMensajeFinal.style.display = "block";
-                    saMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    saMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
-                } else {
-                    saMensajeFinal.style.display = "none";
-                }
-            });
-        }
-
-        function limpiarTodoElHistorial() {
-            if (confirm("⚠️ ¿Estás seguro de que deseas borrar TODOS los recorridos guardados y reiniciar el sistema por completo? Esta acción no se puede deshacer.")) {
-                db.ref('recorridos_archivados').remove();
-                db.ref('recorrido_activo').remove();
-                alert("🧹 ¡Historial limpiado con éxito!");
-            }
-        }
-
-        // ================= FUNCIONES COMPARTIDAS (ACORDEÓN) =================
-        function cargarHistorialArchivado(elementId) {
-            db.ref('recorridos_archivados').on('value', (snapshot) => {
-                const contenedor = document.getElementById(elementId);
-                if (!contenedor) return;
-                contenedor.innerHTML = '';
-
-                const data = snapshot.val();
-                if (!data) {
-                    contenedor.innerHTML = '<p style="color: #adb5bd;">No hay recorridos archivados todavía.</p>';
-                    return;
-                }
-
-                const llaves = Object.keys(data).reverse();
-                let numeroRecorrido = llaves.length;
-
-                llaves.forEach((key) => {
-                    const item = data[key];
-                    const esExito = item.exitoso;
-                    const tagClass = esExito ? 'tag-exito' : 'tag-error';
-                    const tagTexto = esExito ? 'BIEN' : 'NEGATIVO';
-
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'acordeon-item';
-
-                    let filasHTML = '';
-                    if (item.historial) {
-                        item.historial.forEach(reg => {
-                            filasHTML += `<tr><td>${reg.hora}</td><td>${reg.qr}</td><td class="${reg.clase}">${reg.resultado}</td></tr>`;
-                        });
-                    }
-
-                    const acordeonId = `${elementId}-${key}`;
-
-                    itemDiv.innerHTML = `
-                        <button class="acordeon-header" onclick="toggleAcordeon('${acordeonId}')">
-                            <span>Recorrido #${numeroRecorrido} <small style="font-weight:normal; font-size:0.85rem; color:#adb5bd;">(${item.fecha})</small></span>
-                            <span class="tag-resultado ${tagClass}">${tagTexto}</span>
-                        </button>
-                        <div id="contenido-${acordeonId}" class="acordeon-contenido">
-                            <table>
-                                <thead>
-                                    <tr><th>Hora</th><th>QR</th><th>Resultado</th></tr>
-                                </thead>
-                                <tbody>
-                                    ${filasHTML}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-
-                    contenedor.appendChild(itemDiv);
-                    numeroRecorrido--;
-                });
-            });
-        }
-
-        function toggleAcordeon(id) {
-            const el = document.getElementById(`contenido-${id}`);
-            if (el) {
-                el.classList.toggle('activo');
-            }
-        }
-    </script>
-</body>
-</html>
+            document.
