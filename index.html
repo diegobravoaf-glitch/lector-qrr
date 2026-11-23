@@ -67,7 +67,7 @@
         }
         video { width: 100%; height: 100%; object-fit: cover; }
         .info-secuencia { font-size: 1.3rem; margin: 10px 0; font-weight: bold; color: #fff; }
-        #numero-esperado, #supervisor-esperado, #superadmin-esperado { color: #00d4ff; font-size: 1.8rem; }
+        #numero-esperado, #supervisor-esperado, #superadmin-esperado { color: #00d4ff; font-size: 1.5rem; display: block; margin-top: 4px; }
 
         .controles {
             margin: 15px 0;
@@ -187,7 +187,7 @@
         <h1>Lector QR Secuencial</h1>
 
         <div class="info-secuencia">
-            Siguiente esperado: <span id="numero-esperado">1</span>
+            Siguiente esperado: <span id="numero-esperado">1/31: AZOTEA</span>
         </div>
 
         <div class="controles">
@@ -235,7 +235,7 @@
         <h2>Panel de Supervisión</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente QR: <span id="supervisor-esperado">1</span>
+            Recorrido en curso - Siguiente QR: <span id="supervisor-esperado">1/31: AZOTEA</span>
         </div>
 
         <div id="supervisor-mensaje-final"></div>
@@ -268,7 +268,7 @@
         <h2>Panel de Super Admin</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente QR: <span id="superadmin-esperado">1</span>
+            Recorrido en curso - Siguiente QR: <span id="superadmin-esperado">1/31: AZOTEA</span>
         </div>
 
         <div id="superadmin-mensaje-final"></div>
@@ -326,7 +326,50 @@
             "diego": { pass: "admin2026", rol: "superadmin" }
         };
 
-        const TOTAL_PUNTOS = 6;
+        // ================= SECUENCIA DE 31 PUNTOS =================
+        const PUNTOS_RECORRIDO = [
+            "AZOTEA",
+            "PISO PH",
+            "PISO 10",
+            "PISO 09",
+            "PISO 08",
+            "SERVIDORES TI",
+            "PISO 07",
+            "PISO 06",
+            "PISO 05",
+            "PISO 04",
+            "PISO 03",
+            "PISO 02",
+            "PISO 1",
+            "UDITORIO",
+            "CECON",
+            "FINANZAS",
+            "PB",
+            "CHILLER",
+            "COMEDOR PB",
+            "ATENCION AL CIDADANO",
+            "SUB SOTANO 04",
+            "SOTANO 04",
+            "SUB SOTANO 03",
+            "SUB SOTANO 02",
+            "SOTANO 01 ESCALERAS",
+            "SOTANO 01",
+            "RAMPA 02",
+            "CUARTO DE ESCOLTAS",
+            "SOTANO VIP",
+            "SOTANO 01 PLATA ELECTRICA",
+            "RAMPA 01"
+        ];
+
+        const TOTAL_PUNTOS = PUNTOS_RECORRIDO.length;
+
+        function obtenerEtiquetaPunto(numeroPaso) {
+            if (numeroPaso > TOTAL_PUNTOS) {
+                return "COMPLETADO";
+            }
+            const indice = Math.max(0, numeroPaso - 1);
+            return `${numeroPaso}/${TOTAL_PUNTOS}: ${PUNTOS_RECORRIDO[indice]}`;
+        }
 
         function validarLogin() {
             const userIngresado = document.getElementById("username").value.trim();
@@ -442,17 +485,23 @@
             tiempoUltimoEscaneo = ahoraTiempo;
 
             const horaFormateada = new Date().toLocaleTimeString();
+            const qrNormalizado = textoQR.trim().toUpperCase();
+            const puntoEsperado = PUNTOS_RECORRIDO[siguienteEsperado - 1];
+
             let resultadoTexto = "";
             let claseResultado = "";
 
-            if (siguienteEsperado <= TOTAL_PUNTOS && textoQR.trim() === String(siguienteEsperado)) {
+            if (siguienteEsperado <= TOTAL_PUNTOS && qrNormalizado === puntoEsperado) {
                 resultadoTexto = "Válido";
                 claseResultado = "valido";
 
-                const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR, resultado: resultadoTexto, clase: claseResultado };
+                const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
 
                 if (siguienteEsperado === TOTAL_PUNTOS) {
                     recorridoFinalizado = true;
+                    siguienteEsperado++;
+                    txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado);
+
                     db.ref('recorrido_activo/historial').once('value').then((snapshot) => {
                         let historial = snapshot.val() || [];
                         historial.unshift(nuevaFilaDatos);
@@ -461,25 +510,31 @@
                             esperado: siguienteEsperado,
                             historial: historial,
                             finalizado: true,
-                            errores: false
+                            errores: huboErroresEnRecorrido
                         };
                         db.ref('recorrido_activo').set(estado);
                         renderizarTablaOficial(historial);
 
+                        const esPerfecto = !huboErroresEnRecorrido;
                         db.ref('recorridos_archivados').push({
                             fecha: new Date().toLocaleString(),
-                            exitoso: true,
+                            exitoso: esPerfecto,
                             historial: historial
                         });
-                    });
 
-                    mensajeFinal.style.display = "block";
-                    mensajeFinal.className = "bg-exito";
-                    mensajeFinal.innerHTML = "✅ Bien: ¡Los 6 puntos del recorrido se completaron de forma perfecta!";
+                        mensajeFinal.style.display = "block";
+                        if (esPerfecto) {
+                            mensajeFinal.className = "bg-exito";
+                            mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
+                        } else {
+                            mensajeFinal.className = "bg-error";
+                            mensajeFinal.innerHTML = "❌ Negativo: El recorrido llegó al final pero tuvo lecturas incorrectas.";
+                        }
+                    });
                     return;
                 } else {
                     siguienteEsperado++;
-                    txtEsperado.innerText = siguienteEsperado;
+                    txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado);
                 }
             } else {
                 resultadoTexto = "Incorrecto";
@@ -487,7 +542,7 @@
                 huboErroresEnRecorrido = true;
             }
 
-            const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR, resultado: resultadoTexto, clase: claseResultado };
+            const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
             sincronizarANube(nuevaFilaDatos);
         }
 
@@ -524,7 +579,7 @@
 
             if (estadoExito) {
                 mensajeFinal.className = "bg-exito";
-                mensajeFinal.innerHTML = "✅ Bien: ¡Los 6 puntos del recorrido se completaron de forma perfecta!";
+                mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
             } else {
                 mensajeFinal.className = "bg-error";
                 mensajeFinal.innerHTML = "❌ Negativo: El recorrido finalizó con errores o saltos de puntos.";
@@ -541,7 +596,7 @@
                 }
             });
 
-            db.ref('recorrido_activo').update({ finalizado: true, errores: huboErroresEnRecorrido });
+            db.ref('recorrido_activo').update({ finalizado: true, errores: !estadoExito });
         }
 
         function cargarEstadoNubeOficial() {
@@ -551,7 +606,7 @@
                     siguienteEsperado = estado.esperado || 1;
                     recorridoFinalizado = estado.finalizado || false;
                     huboErroresEnRecorrido = estado.errores || false;
-                    txtEsperado.innerText = siguienteEsperado;
+                    txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado);
                     if (estado.historial) renderizarTablaOficial(estado.historial);
 
                     if (recorridoFinalizado) {
@@ -559,6 +614,8 @@
                         mensajeFinal.className = huboErroresEnRecorrido ? "bg-error" : "bg-exito";
                         mensajeFinal.innerHTML = huboErroresEnRecorrido ? "❌ Negativo: El recorrido finalizó con errores o saltos." : "✅ Bien: ¡Recorrido completado perfectamente!";
                     }
+                } else {
+                    txtEsperado.innerText = obtenerEtiquetaPunto(1);
                 }
             });
         }
@@ -578,7 +635,7 @@
             siguienteEsperado = 1;
             huboErroresEnRecorrido = false;
             recorridoFinalizado = false;
-            txtEsperado.innerText = siguienteEsperado;
+            txtEsperado.innerText = obtenerEtiquetaPunto(1);
             tablaHistorial.innerHTML = '';
             ultimoCodigoLeido = null;
             mensajeFinal.style.display = "none";
@@ -590,13 +647,13 @@
                 if (document.getElementById('supervisor-section').classList.contains('hidden')) return;
                 const estado = snapshot.val();
                 if (!estado) {
-                    document.getElementById('supervisor-esperado').innerText = "1";
+                    document.getElementById('supervisor-esperado').innerText = obtenerEtiquetaPunto(1);
                     document.getElementById('supervisor-tabla-historial').innerHTML = "";
                     document.getElementById('supervisor-mensaje-final').style.display = "none";
                     return;
                 }
 
-                document.getElementById('supervisor-esperado').innerText = estado.esperado || 1;
+                document.getElementById('supervisor-esperado').innerText = obtenerEtiquetaPunto(estado.esperado || 1);
                 const supTabla = document.getElementById('supervisor-tabla-historial');
                 supTabla.innerHTML = '';
                 if (estado.historial) {
@@ -624,13 +681,13 @@
                 if (document.getElementById('superadmin-section').classList.contains('hidden')) return;
                 const estado = snapshot.val();
                 if (!estado) {
-                    document.getElementById('superadmin-esperado').innerText = "1";
+                    document.getElementById('superadmin-esperado').innerText = obtenerEtiquetaPunto(1);
                     document.getElementById('superadmin-tabla-historial').innerHTML = "";
                     document.getElementById('superadmin-mensaje-final').style.display = "none";
                     return;
                 }
 
-                document.getElementById('superadmin-esperado').innerText = estado.esperado || 1;
+                document.getElementById('superadmin-esperado').innerText = obtenerEtiquetaPunto(estado.esperado || 1);
                 const saTabla = document.getElementById('superadmin-tabla-historial');
                 saTabla.innerHTML = '';
                 if (estado.historial) {
