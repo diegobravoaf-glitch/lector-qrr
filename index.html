@@ -26,6 +26,7 @@
             margin: 0 auto;
             padding: 15px;
             text-align: center;
+            /* --- TEMA OSCURO Y TECNOLÓGICO (BLINDAJE HEXAGONAL) --- */
             background-color: #12141a;
             color: #e9ecef;
         }
@@ -65,22 +66,8 @@
             box-shadow: 0 0 10px rgba(0,212,255,0.3);
         }
         video { width: 100%; height: 100%; object-fit: cover; }
-        .info-secuencia {
-            font-size: 1.15rem;
-            margin: 10px 0;
-            font-weight: bold;
-            color: #fff;
-            background: #1a1e23;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #2a2f35;
-        }
-        #numero-esperado, #supervisor-esperado, #superadmin-esperado {
-            display: block;
-            color: #00d4ff;
-            font-size: 1.45rem;
-            margin-top: 4px;
-        }
+        .info-secuencia { font-size: 1.3rem; margin: 10px 0; font-weight: bold; color: #fff; }
+        #numero-esperado, #supervisor-esperado, #superadmin-esperado { color: #00d4ff; font-size: 1.8rem; }
 
         .controles {
             margin: 15px 0;
@@ -111,7 +98,7 @@
             overflow: hidden;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        th, td { padding: 10px; border-bottom: 1px solid #3f454d; text-align: center; color: #e9ecef; font-size: 0.92rem; }
+        th, td { padding: 10px; border-bottom: 1px solid #3f454d; text-align: center; color: #e9ecef; }
         th { background-color: #1a1e23; color: white; }
         .valido { color: #2ecc71; font-weight: bold; }
         .invalido { color: #e74c3c; font-weight: bold; }
@@ -136,6 +123,7 @@
             margin-bottom: 10px;
         }
 
+        /* --- ESTILOS DEL HISTORIAL DESPLEGABLE (ACORDEÓN) --- */
         .acordeon-item {
             background: #212529;
             border: 1px solid #3f454d;
@@ -178,6 +166,7 @@
 </head>
 <body>
 
+    <!-- SECCIÓN DE LOGIN -->
     <div id="login-section" class="container">
         <h2>Iniciar Sesión</h2>
         <div class="form-group">
@@ -192,12 +181,13 @@
         <div id="error-message" class="error-msg"></div>
     </div>
 
+    <!-- SECCIÓN DEL OFICIAL (OPERADOR) -->
     <div id="app-section" class="hidden">
         <span class="badge-rol">Rol: Oficial de Recorrido</span>
         <h1>Lector QR Secuencial</h1>
 
         <div class="info-secuencia">
-            Siguiente punto esperado: <span id="numero-esperado">1/32: AZOTEA</span>
+            Siguiente esperado: <span id="numero-esperado">1</span>
         </div>
 
         <div class="controles">
@@ -216,7 +206,7 @@
             <thead>
                 <tr>
                     <th>Hora</th>
-                    <th>Punto QR</th>
+                    <th>QR</th>
                     <th>Resultado</th>
                 </tr>
             </thead>
@@ -239,12 +229,13 @@
         </div>
     </div>
 
+    <!-- SECCIÓN DE LOS SUPERVISORES (MONITOREO Y HISTORIAL ACUMULADO) -->
     <div id="supervisor-section" class="hidden">
         <span class="badge-rol" style="background-color: #198754;">Rol: Supervisor (Monitoreo en Vivo)</span>
         <h2>Panel de Supervisión</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente punto: <span id="supervisor-esperado">1/32: AZOTEA</span>
+            Recorrido en curso - Siguiente QR: <span id="supervisor-esperado">1</span>
         </div>
 
         <div id="supervisor-mensaje-final"></div>
@@ -254,7 +245,7 @@
             <thead>
                 <tr>
                     <th>Hora</th>
-                    <th>Punto QR</th>
+                    <th>QR</th>
                     <th>Resultado</th>
                 </tr>
             </thead>
@@ -271,12 +262,13 @@
         <button onclick="cerrarSesion()" style="background-color: #6c757d; width: 100%; margin-top: 25px;">Cerrar Sesión</button>
     </div>
 
+    <!-- SECCIÓN DEL SUPER ADMIN (CONTROL TOTAL Y LIMPIEZA) -->
     <div id="superadmin-section" class="hidden">
         <span class="badge-rol" style="background-color: #d63384;">Rol: Super Administrador (Control Total)</span>
         <h2>Panel de Super Admin</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente punto: <span id="superadmin-esperado">1/32: AZOTEA</span>
+            Recorrido en curso - Siguiente QR: <span id="superadmin-esperado">1</span>
         </div>
 
         <div id="superadmin-mensaje-final"></div>
@@ -286,7 +278,7 @@
             <thead>
                 <tr>
                     <th>Hora</th>
-                    <th>Punto QR</th>
+                    <th>QR</th>
                     <th>Resultado</th>
                 </tr>
             </thead>
@@ -297,8 +289,9 @@
 
         <h2>Gestión e Historial de Recorridos</h2>
 
+        <!-- BOTÓN MAESTRO PARA LIMPIAR TODO -->
         <button onclick="limpiarTodoElHistorial()" class="btn-peligro" style="width: 100%; margin-bottom: 20px; padding: 15px; font-size: 1.1rem;">
-            Limpiar y Borrar Todo el Historial
+            🗑️ Limpiar y Borrar Todo el Historial
         </button>
 
         <div id="contenedor-acordeon-superadmin">
@@ -309,6 +302,7 @@
     </div>
 
     <script>
+        // ================= CONFIGURACIÓN DE FIREBASE =================
         const firebaseConfig = {
             apiKey: "AIzaSyC2tdcGs6vLSkWNq8bJyG7RuI-21uK3ZwI",
             authDomain: "aplicacionqr-435ca.firebaseapp.com",
@@ -322,6 +316,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        // ================= CONFIGURACIÓN DE USUARIOS =================
         const USUARIOS = {
             "admin": { pass: "1234", rol: "oficial" },
             "supervisor11": { pass: "clave11", rol: "supervisor" },
@@ -331,49 +326,7 @@
             "diego": { pass: "admin2026", rol: "superadmin" }
         };
 
-        const PUNTOS_RECORRIDO = [
-            "AZOTEA",
-            "PISO PH",
-            "PISO 10",
-            "PISO 09",
-            "PISO 08",
-            "SERVIDORES TI",
-            "PISO 07",
-            "PISO 06",
-            "PISO 05",
-            "PISO 04",
-            "PISO 03",
-            "PISO 02",
-            "PISO 1",
-            "UDITORIO",
-            "CECON",
-            "FINANZAS",
-            "PB",
-            "CHILLER",
-            "COMEDOR PB",
-            "ATENCION AL CIDADANO",
-            "SUB SOTANO 04",
-            "SOTANO 04",
-            "SUB SOTANO 03",
-            "SUB SOTANO 02",
-            "SOTANO 01 ESCALERAS",
-            "SOTANO 01",
-            "RAMPA 02",
-            "CUARTO DE ESCOLTAS",
-            "SOTANO VIP",
-            "SOTANO 01 PLATA ELECTRICA",
-            "RAMPA 01"
-        ];
-
-        const TOTAL_PUNTOS = PUNTOS_RECORRIDO.length;
-
-        function formatearPuntoEsperado(paso) {
-            if (paso > TOTAL_PUNTOS) {
-                return "RECORRIDO COMPLETADO";
-            }
-            const indice = Math.max(0, paso - 1);
-            return `${paso}/${TOTAL_PUNTOS}: ${PUNTOS_RECORRIDO[indice]}`;
-        }
+        const TOTAL_PUNTOS = 6;
 
         function validarLogin() {
             const userIngresado = document.getElementById("username").value.trim();
@@ -418,6 +371,7 @@
             document.getElementById("login-section").classList.remove("hidden");
         }
 
+        // ================= LÓGICA DEL OFICIAL =================
         let siguienteEsperado = 1;
         let listaDispositivos = [];
         let flujoActual = null;
@@ -488,57 +442,44 @@
             tiempoUltimoEscaneo = ahoraTiempo;
 
             const horaFormateada = new Date().toLocaleTimeString();
-            const qrLimpio = textoQR.trim().toUpperCase();
-            const puntoEsperadoTexto = PUNTOS_RECORRIDO[siguienteEsperado - 1];
-
             let resultadoTexto = "";
             let claseResultado = "";
 
-            if (siguienteEsperado <= TOTAL_PUNTOS && qrLimpio === puntoEsperadoTexto) {
+            if (siguienteEsperado <= TOTAL_PUNTOS && textoQR.trim() === String(siguienteEsperado)) {
                 resultadoTexto = "Válido";
                 claseResultado = "valido";
 
-                const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
+                const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR, resultado: resultadoTexto, clase: claseResultado };
 
                 if (siguienteEsperado === TOTAL_PUNTOS) {
                     recorridoFinalizado = true;
-                    siguienteEsperado++;
-                    txtEsperado.innerText = formatearPuntoEsperado(siguienteEsperado);
-
                     db.ref('recorrido_activo/historial').once('value').then((snapshot) => {
                         let historial = snapshot.val() || [];
                         historial.unshift(nuevaFilaDatos);
 
                         const estado = {
                             esperado: siguienteEsperado,
-                            puntoNombre: formatearPuntoEsperado(siguienteEsperado),
                             historial: historial,
                             finalizado: true,
-                            errores: huboErroresEnRecorrido
+                            errores: false
                         };
                         db.ref('recorrido_activo').set(estado);
                         renderizarTablaOficial(historial);
 
-                        const esPerfecto = !huboErroresEnRecorrido;
                         db.ref('recorridos_archivados').push({
                             fecha: new Date().toLocaleString(),
-                            exitoso: esPerfecto,
+                            exitoso: true,
                             historial: historial
                         });
-
-                        mensajeFinal.style.display = "block";
-                        if (esPerfecto) {
-                            mensajeFinal.className = "bg-exito";
-                            mensajeFinal.innerHTML = `Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
-                        } else {
-                            mensajeFinal.className = "bg-error";
-                            mensajeFinal.innerHTML = "Negativo: El recorrido llegó al final pero tuvo lecturas incorrectas.";
-                        }
                     });
+
+                    mensajeFinal.style.display = "block";
+                    mensajeFinal.className = "bg-exito";
+                    mensajeFinal.innerHTML = "✅ Bien: ¡Los 6 puntos del recorrido se completaron de forma perfecta!";
                     return;
                 } else {
                     siguienteEsperado++;
-                    txtEsperado.innerText = formatearPuntoEsperado(siguienteEsperado);
+                    txtEsperado.innerText = siguienteEsperado;
                 }
             } else {
                 resultadoTexto = "Incorrecto";
@@ -546,7 +487,7 @@
                 huboErroresEnRecorrido = true;
             }
 
-            const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
+            const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR, resultado: resultadoTexto, clase: claseResultado };
             sincronizarANube(nuevaFilaDatos);
         }
 
@@ -557,7 +498,6 @@
 
                 const estado = {
                     esperado: siguienteEsperado,
-                    puntoNombre: formatearPuntoEsperado(siguienteEsperado),
                     historial: historial,
                     finalizado: recorridoFinalizado,
                     errores: huboErroresEnRecorrido
@@ -584,10 +524,10 @@
 
             if (estadoExito) {
                 mensajeFinal.className = "bg-exito";
-                mensajeFinal.innerHTML = `Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
+                mensajeFinal.innerHTML = "✅ Bien: ¡Los 6 puntos del recorrido se completaron de forma perfecta!";
             } else {
                 mensajeFinal.className = "bg-error";
-                mensajeFinal.innerHTML = "Negativo: El recorrido finalizó incompleto o con errores.";
+                mensajeFinal.innerHTML = "❌ Negativo: El recorrido finalizó con errores o saltos de puntos.";
             }
 
             db.ref('recorrido_activo').once('value').then(snapshot => {
@@ -601,7 +541,7 @@
                 }
             });
 
-            db.ref('recorrido_activo').update({ finalizado: true, errores: !estadoExito });
+            db.ref('recorrido_activo').update({ finalizado: true, errores: huboErroresEnRecorrido });
         }
 
         function cargarEstadoNubeOficial() {
@@ -611,16 +551,14 @@
                     siguienteEsperado = estado.esperado || 1;
                     recorridoFinalizado = estado.finalizado || false;
                     huboErroresEnRecorrido = estado.errores || false;
-                    txtEsperado.innerText = formatearPuntoEsperado(siguienteEsperado);
+                    txtEsperado.innerText = siguienteEsperado;
                     if (estado.historial) renderizarTablaOficial(estado.historial);
 
                     if (recorridoFinalizado) {
                         mensajeFinal.style.display = "block";
                         mensajeFinal.className = huboErroresEnRecorrido ? "bg-error" : "bg-exito";
-                        mensajeFinal.innerHTML = huboErroresEnRecorrido ? "Negativo: El recorrido finalizó con errores o incompleto." : "Bien: ¡Recorrido completado perfectamente!";
+                        mensajeFinal.innerHTML = huboErroresEnRecorrido ? "❌ Negativo: El recorrido finalizó con errores o saltos." : "✅ Bien: ¡Recorrido completado perfectamente!";
                     }
-                } else {
-                    txtEsperado.innerText = formatearPuntoEsperado(1);
                 }
             });
         }
@@ -640,24 +578,25 @@
             siguienteEsperado = 1;
             huboErroresEnRecorrido = false;
             recorridoFinalizado = false;
-            txtEsperado.innerText = formatearPuntoEsperado(1);
+            txtEsperado.innerText = siguienteEsperado;
             tablaHistorial.innerHTML = '';
             ultimoCodigoLeido = null;
             mensajeFinal.style.display = "none";
         });
 
+        // ================= LÓGICA DE SUPERVISORES =================
         function iniciarMonitoreoSupervisor() {
             db.ref('recorrido_activo').on('value', (snapshot) => {
                 if (document.getElementById('supervisor-section').classList.contains('hidden')) return;
                 const estado = snapshot.val();
                 if (!estado) {
-                    document.getElementById('supervisor-esperado').innerText = formatearPuntoEsperado(1);
+                    document.getElementById('supervisor-esperado').innerText = "1";
                     document.getElementById('supervisor-tabla-historial').innerHTML = "";
                     document.getElementById('supervisor-mensaje-final').style.display = "none";
                     return;
                 }
 
-                document.getElementById('supervisor-esperado').innerText = formatearPuntoEsperado(estado.esperado || 1);
+                document.getElementById('supervisor-esperado').innerText = estado.esperado || 1;
                 const supTabla = document.getElementById('supervisor-tabla-historial');
                 supTabla.innerHTML = '';
                 if (estado.historial) {
@@ -672,25 +611,26 @@
                 if (estado.finalizado) {
                     supMensajeFinal.style.display = "block";
                     supMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    supMensajeFinal.innerHTML = estado.errores ? "Negativo: El recorrido finalizó con errores." : "Bien: ¡Recorrido completado perfectamente!";
+                    supMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
                 } else {
                     supMensajeFinal.style.display = "none";
                 }
             });
         }
 
+        // ================= LÓGICA DE SUPER ADMIN =================
         function iniciarMonitoreoSuperAdmin() {
             db.ref('recorrido_activo').on('value', (snapshot) => {
                 if (document.getElementById('superadmin-section').classList.contains('hidden')) return;
                 const estado = snapshot.val();
                 if (!estado) {
-                    document.getElementById('superadmin-esperado').innerText = formatearPuntoEsperado(1);
+                    document.getElementById('superadmin-esperado').innerText = "1";
                     document.getElementById('superadmin-tabla-historial').innerHTML = "";
                     document.getElementById('superadmin-mensaje-final').style.display = "none";
                     return;
                 }
 
-                document.getElementById('superadmin-esperado').innerText = formatearPuntoEsperado(estado.esperado || 1);
+                document.getElementById('superadmin-esperado').innerText = estado.esperado || 1;
                 const saTabla = document.getElementById('superadmin-tabla-historial');
                 saTabla.innerHTML = '';
                 if (estado.historial) {
@@ -705,7 +645,7 @@
                 if (estado.finalizado) {
                     saMensajeFinal.style.display = "block";
                     saMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    saMensajeFinal.innerHTML = estado.errores ? "Negativo: El recorrido finalizó con errores." : "Bien: ¡Recorrido completado perfectamente!";
+                    saMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
                 } else {
                     saMensajeFinal.style.display = "none";
                 }
@@ -713,13 +653,14 @@
         }
 
         function limpiarTodoElHistorial() {
-            if (confirm("¿Estás seguro de que deseas borrar TODOS los recorridos guardados y reiniciar el sistema por completo? Esta acción no se puede deshacer.")) {
+            if (confirm("⚠️ ¿Estás seguro de que deseas borrar TODOS los recorridos guardados y reiniciar el sistema por completo? Esta acción no se puede deshacer.")) {
                 db.ref('recorridos_archivados').remove();
                 db.ref('recorrido_activo').remove();
-                alert("¡Historial limpiado con éxito!");
+                alert("🧹 ¡Historial limpiado con éxito!");
             }
         }
 
+        // ================= FUNCIONES COMPARTIDAS (ACORDEÓN) =================
         function cargarHistorialArchivado(elementId) {
             db.ref('recorridos_archivados').on('value', (snapshot) => {
                 const contenedor = document.getElementById(elementId);
@@ -761,7 +702,7 @@
                         <div id="contenido-${acordeonId}" class="acordeon-contenido">
                             <table>
                                 <thead>
-                                    <tr><th>Hora</th><th>Punto QR</th><th>Resultado</th></tr>
+                                    <tr><th>Hora</th><th>QR</th><th>Resultado</th></tr>
                                 </thead>
                                 <tbody>
                                     ${filasHTML}
