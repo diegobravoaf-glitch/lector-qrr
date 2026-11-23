@@ -1,0 +1,17 @@
+{
+  "short_name": "VigiaQR",
+  "name": "VigiaQR - Control de Recorrido",
+  "icons": [
+    {
+      "src": "icono.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./",
+  "background_color": "#12141a",
+  "theme_color": "#12141a",
+  "display": "standalone",
+  "orientation": "portrait"
+}
