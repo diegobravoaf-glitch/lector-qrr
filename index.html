@@ -26,7 +26,6 @@
             margin: 0 auto;
             padding: 15px;
             text-align: center;
-            /* --- TEMA OSCURO Y TECNOLÓGICO (BLINDAJE HEXAGONAL) --- */
             background-color: #12141a;
             color: #e9ecef;
         }
@@ -137,7 +136,6 @@
             margin-bottom: 10px;
         }
 
-        /* --- ESTILOS DEL HISTORIAL DESPLEGABLE (ACORDEÓN) --- */
         .acordeon-item {
             background: #212529;
             border: 1px solid #3f454d;
@@ -180,7 +178,6 @@
 </head>
 <body>
 
-    <!-- SECCIÓN DE LOGIN -->
     <div id="login-section" class="container">
         <h2>Iniciar Sesión</h2>
         <div class="form-group">
@@ -195,13 +192,12 @@
         <div id="error-message" class="error-msg"></div>
     </div>
 
-    <!-- SECCIÓN DEL OFICIAL (OPERADOR) -->
     <div id="app-section" class="hidden">
         <span class="badge-rol">Rol: Oficial de Recorrido</span>
         <h1>Lector QR Secuencial</h1>
 
         <div class="info-secuencia">
-            Siguiente punto esperado: <span id="numero-esperado">1/31: AZOTEA</span>
+            Siguiente punto esperado: <span id="numero-esperado">1/32: AZOTEA</span>
         </div>
 
         <div class="controles">
@@ -243,13 +239,12 @@
         </div>
     </div>
 
-    <!-- SECCIÓN DE LOS SUPERVISORES (MONITOREO Y HISTORIAL ACUMULADO) -->
     <div id="supervisor-section" class="hidden">
         <span class="badge-rol" style="background-color: #198754;">Rol: Supervisor (Monitoreo en Vivo)</span>
         <h2>Panel de Supervisión</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente punto: <span id="supervisor-esperado">1/31: AZOTEA</span>
+            Recorrido en curso - Siguiente punto: <span id="supervisor-esperado">1/32: AZOTEA</span>
         </div>
 
         <div id="supervisor-mensaje-final"></div>
@@ -276,13 +271,12 @@
         <button onclick="cerrarSesion()" style="background-color: #6c757d; width: 100%; margin-top: 25px;">Cerrar Sesión</button>
     </div>
 
-    <!-- SECCIÓN DEL SUPER ADMIN (CONTROL TOTAL Y LIMPIEZA) -->
     <div id="superadmin-section" class="hidden">
         <span class="badge-rol" style="background-color: #d63384;">Rol: Super Administrador (Control Total)</span>
         <h2>Panel de Super Admin</h2>
 
         <div class="info-secuencia">
-            Recorrido en curso - Siguiente punto: <span id="superadmin-esperado">1/31: AZOTEA</span>
+            Recorrido en curso - Siguiente punto: <span id="superadmin-esperado">1/32: AZOTEA</span>
         </div>
 
         <div id="superadmin-mensaje-final"></div>
@@ -303,9 +297,8 @@
 
         <h2>Gestión e Historial de Recorridos</h2>
 
-        <!-- BOTÓN MAESTRO PARA LIMPIAR TODO -->
         <button onclick="limpiarTodoElHistorial()" class="btn-peligro" style="width: 100%; margin-bottom: 20px; padding: 15px; font-size: 1.1rem;">
-            🗑️ Limpiar y Borrar Todo el Historial
+            Limpiar y Borrar Todo el Historial
         </button>
 
         <div id="contenedor-acordeon-superadmin">
@@ -316,7 +309,6 @@
     </div>
 
     <script>
-        // ================= CONFIGURACIÓN DE FIREBASE =================
         const firebaseConfig = {
             apiKey: "AIzaSyC2tdcGs6vLSkWNq8bJyG7RuI-21uK3ZwI",
             authDomain: "aplicacionqr-435ca.firebaseapp.com",
@@ -330,7 +322,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // ================= CONFIGURACIÓN DE USUARIOS =================
         const USUARIOS = {
             "admin": { pass: "1234", rol: "oficial" },
             "supervisor11": { pass: "clave11", rol: "supervisor" },
@@ -340,7 +331,6 @@
             "diego": { pass: "admin2026", rol: "superadmin" }
         };
 
-        // ================= SECUENCIA CRONOLÓGICA DE 31 PUNTOS =================
         const PUNTOS_RECORRIDO = [
             "AZOTEA",
             "PISO PH",
@@ -428,7 +418,6 @@
             document.getElementById("login-section").classList.remove("hidden");
         }
 
-        // ================= LÓGICA DEL OFICIAL =================
         let siguienteEsperado = 1;
         let listaDispositivos = [];
         let flujoActual = null;
@@ -540,10 +529,10 @@
                         mensajeFinal.style.display = "block";
                         if (esPerfecto) {
                             mensajeFinal.className = "bg-exito";
-                            mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
+                            mensajeFinal.innerHTML = `Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
                         } else {
                             mensajeFinal.className = "bg-error";
-                            mensajeFinal.innerHTML = "❌ Negativo: El recorrido llegó al final pero tuvo lecturas incorrectas.";
+                            mensajeFinal.innerHTML = "Negativo: El recorrido llegó al final pero tuvo lecturas incorrectas.";
                         }
                     });
                     return;
@@ -595,10 +584,10 @@
 
             if (estadoExito) {
                 mensajeFinal.className = "bg-exito";
-                mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
+                mensajeFinal.innerHTML = `Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
             } else {
                 mensajeFinal.className = "bg-error";
-                mensajeFinal.innerHTML = "❌ Negativo: El recorrido finalizó incompleto o con errores.";
+                mensajeFinal.innerHTML = "Negativo: El recorrido finalizó incompleto o con errores.";
             }
 
             db.ref('recorrido_activo').once('value').then(snapshot => {
@@ -628,7 +617,7 @@
                     if (recorridoFinalizado) {
                         mensajeFinal.style.display = "block";
                         mensajeFinal.className = huboErroresEnRecorrido ? "bg-error" : "bg-exito";
-                        mensajeFinal.innerHTML = huboErroresEnRecorrido ? "❌ Negativo: El recorrido finalizó con errores o incompleto." : "✅ Bien: ¡Recorrido completado perfectamente!";
+                        mensajeFinal.innerHTML = huboErroresEnRecorrido ? "Negativo: El recorrido finalizó con errores o incompleto." : "Bien: ¡Recorrido completado perfectamente!";
                     }
                 } else {
                     txtEsperado.innerText = formatearPuntoEsperado(1);
@@ -657,7 +646,6 @@
             mensajeFinal.style.display = "none";
         });
 
-        // ================= LÓGICA DE SUPERVISORES =================
         function iniciarMonitoreoSupervisor() {
             db.ref('recorrido_activo').on('value', (snapshot) => {
                 if (document.getElementById('supervisor-section').classList.contains('hidden')) return;
@@ -684,14 +672,13 @@
                 if (estado.finalizado) {
                     supMensajeFinal.style.display = "block";
                     supMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    supMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
+                    supMensajeFinal.innerHTML = estado.errores ? "Negativo: El recorrido finalizó con errores." : "Bien: ¡Recorrido completado perfectamente!";
                 } else {
                     supMensajeFinal.style.display = "none";
                 }
             });
         }
 
-        // ================= LÓGICA DE SUPER ADMIN =================
         function iniciarMonitoreoSuperAdmin() {
             db.ref('recorrido_activo').on('value', (snapshot) => {
                 if (document.getElementById('superadmin-section').classList.contains('hidden')) return;
@@ -718,7 +705,7 @@
                 if (estado.finalizado) {
                     saMensajeFinal.style.display = "block";
                     saMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    saMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
+                    saMensajeFinal.innerHTML = estado.errores ? "Negativo: El recorrido finalizó con errores." : "Bien: ¡Recorrido completado perfectamente!";
                 } else {
                     saMensajeFinal.style.display = "none";
                 }
@@ -726,14 +713,13 @@
         }
 
         function limpiarTodoElHistorial() {
-            if (confirm("⚠️ ¿Estás seguro de que deseas borrar TODOS los recorridos guardados y reiniciar el sistema por completo? Esta acción no se puede deshacer.")) {
+            if (confirm("¿Estás seguro de que deseas borrar TODOS los recorridos guardados y reiniciar el sistema por completo? Esta acción no se puede deshacer.")) {
                 db.ref('recorridos_archivados').remove();
                 db.ref('recorrido_activo').remove();
-                alert("🧹 ¡Historial limpiado con éxito!");
+                alert("¡Historial limpiado con éxito!");
             }
         }
 
-        // ================= FUNCIONES COMPARTIDAS (ACORDEÓN) =================
         function cargarHistorialArchivado(elementId) {
             db.ref('recorridos_archivados').on('value', (snapshot) => {
                 const contenedor = document.getElementById(elementId);
