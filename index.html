@@ -81,6 +81,34 @@
             display: none;
         }
 
+        /* --- TARJETA DE VERIFICACIÓN DE IDENTIDAD --- */
+        .verificacion-card {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background-color: #1a1e23;
+            border: 1px solid #00d4ff;
+            text-align: center;
+        }
+        .verificacion-alerta {
+            background-color: #143642;
+            border-color: #00d4ff;
+            color: #e3fafc;
+        }
+        .foto-verificacion-preview {
+            width: 100%;
+            max-width: 260px;
+            border-radius: 8px;
+            margin: 10px auto;
+            display: block;
+            border: 2px solid #3f454d;
+        }
+        .estado-verificacion {
+            font-size: 0.9rem;
+            color: #adb5bd;
+            margin: 8px 0;
+        }
+
         .controles {
             margin: 15px 0;
             display: flex;
@@ -100,6 +128,7 @@
         button:hover { opacity: 0.9; }
         button.btn-peligro { background-color: #dc3545; }
         button.btn-exito { background-color: #198754; }
+        button.btn-alerta { background-color: #0096c7; }
 
         table {
             width: 100%;
@@ -204,6 +233,16 @@
 
         <div id="aviso-ya-validado" class="aviso-duplicado"></div>
 
+        <!-- BLOQUE DE VERIFICACIÓN SOLICITADA POR SUPERVISOR -->
+        <div id="bloque-verificacion-oficial" class="verificacion-card verificacion-alerta hidden">
+            <strong>🛡️ Verificación de Identidad Solicitada</strong>
+            <p id="texto-solicitud-oficial" style="margin: 8px 0; font-size: 0.95rem;">El supervisor solicita una foto de confirmación del recorrido.</p>
+            <button id="btn-tomar-foto-verificacion" onclick="tomarFotoVerificacion()" class="btn-alerta" style="width: 100%;">
+                📸 Tomar Foto de Verificación
+            </button>
+            <div id="estado-foto-oficial" class="estado-verificacion"></div>
+        </div>
+
         <div class="controles">
             <button id="btn-iniciar">Encender Cámara</button>
             <select id="selector-camara" style="display:none; padding:10px; border-radius:8px; background:#2a2f35; color:#fff; border:1px solid #3f454d;"></select>
@@ -252,6 +291,16 @@
             Recorrido en curso - Siguiente QR: <span id="supervisor-esperado">1/31: AZOTEA</span>
         </div>
 
+        <!-- CONTROL DE VERIFICACIÓN FOTOGRÁFICA PARA SUPERVISOR -->
+        <div class="verificacion-card">
+            <h3>Confirmación de Identidad del Oficial</h3>
+            <button onclick="solicitarVerificacionFoto()" class="btn-alerta" style="width: 100%;">
+                📸 Solicitar Foto de Verificación
+            </button>
+            <div id="estado-verificacion-supervisor" class="estado-verificacion">Sin solicitudes recientes.</div>
+            <img id="foto-verificacion-supervisor" class="foto-verificacion-preview hidden" alt="Foto de verificación del oficial">
+        </div>
+
         <div id="supervisor-mensaje-final"></div>
 
         <h3>Recorrido Activo en Vivo</h3>
@@ -283,6 +332,16 @@
 
         <div class="info-secuencia">
             Recorrido en curso - Siguiente QR: <span id="superadmin-esperado">1/31: AZOTEA</span>
+        </div>
+
+        <!-- CONTROL DE VERIFICACIÓN FOTOGRÁFICA PARA SUPER ADMIN -->
+        <div class="verificacion-card">
+            <h3>Confirmación de Identidad del Oficial</h3>
+            <button onclick="solicitarVerificacionFoto()" class="btn-alerta" style="width: 100%;">
+                📸 Solicitar Foto de Verificación
+            </button>
+            <div id="estado-verificacion-superadmin" class="estado-verificacion">Sin solicitudes recientes.</div>
+            <img id="foto-verificacion-superadmin" class="foto-verificacion-preview hidden" alt="Foto de verificación del oficial">
         </div>
 
         <div id="superadmin-mensaje-final"></div>
@@ -376,6 +435,8 @@
         ];
 
         const TOTAL_PUNTOS = PUNTOS_RECORRIDO.length;
+        let usuarioActivo = "";
+        let rolActivo = "";
 
         function obtenerEtiquetaPunto(numeroPaso) {
             if (numeroPaso > TOTAL_PUNTOS) {
@@ -391,21 +452,26 @@
             const errorDiv = document.getElementById("error-message");
 
             if (USUARIOS[userIngresado] && USUARIOS[userIngresado].pass === passIngresado) {
+                usuarioActivo = userIngresado;
+                rolActivo = USUARIOS[userIngresado].rol;
+
                 document.getElementById("login-section").classList.add("hidden");
                 errorDiv.textContent = "";
 
-                const rol = USUARIOS[userIngresado].rol;
-                if (rol === "oficial") {
+                if (rolActivo === "oficial") {
                     document.getElementById("app-section").classList.remove("hidden");
                     cargarEstadoNubeOficial();
+                    escucharSolicitudesVerificacionOficial();
                     cargarHistorialArchivado("contenedor-acordeon-oficial");
-                } else if (rol === "supervisor") {
+                } else if (rolActivo === "supervisor") {
                     document.getElementById("supervisor-section").classList.remove("hidden");
                     iniciarMonitoreoSupervisor();
+                    escucharEstadoVerificacionMonitor("estado-verificacion-supervisor", "foto-verificacion-supervisor");
                     cargarHistorialArchivado("contenedor-acordeon-supervisores");
-                } else if (rol === "superadmin") {
+                } else if (rolActivo === "superadmin") {
                     document.getElementById("superadmin-section").classList.remove("hidden");
                     iniciarMonitoreoSuperAdmin();
+                    escucharEstadoVerificacionMonitor("estado-verificacion-superadmin", "foto-verificacion-superadmin");
                     cargarHistorialArchivado("contenedor-acordeon-superadmin");
                 }
             } else {
@@ -419,6 +485,8 @@
                 flujoActual = null;
                 btnIniciar.style.display = 'inline-block';
             }
+            usuarioActivo = "";
+            rolActivo = "";
             document.getElementById("username").value = "";
             document.getElementById("password").value = "";
 
@@ -426,6 +494,123 @@
             document.getElementById("supervisor-section").classList.add("hidden");
             document.getElementById("superadmin-section").classList.add("hidden");
             document.getElementById("login-section").classList.remove("hidden");
+        }
+
+        // ================= VERIFICACIÓN FOTOGRÁFICA =================
+        function solicitarVerificacionFoto() {
+            const horaActual = new Date().toLocaleTimeString();
+            db.ref('verificacion_identidad').set({
+                estado: "pendiente",
+                solicitadoPor: usuarioActivo || "supervisor",
+                horaSolicitud: horaActual,
+                fotoBase64: "",
+                horaRespuesta: "",
+                respondidoPor: ""
+            });
+        }
+
+        function escucharSolicitudesVerificacionOficial() {
+            db.ref('verificacion_identidad').on('value', (snapshot) => {
+                if (rolActivo !== "oficial") return;
+                const bloque = document.getElementById("bloque-verificacion-oficial");
+                const textoSol = document.getElementById("texto-solicitud-oficial");
+                const estadoFoto = document.getElementById("estado-foto-oficial");
+                if (!bloque) return;
+
+                const data = snapshot.val();
+                if (!data) {
+                    bloque.classList.add("hidden");
+                    return;
+                }
+
+                if (data.estado === "pendiente") {
+                    bloque.classList.remove("hidden");
+                    textoSol.textContent = `Solicitado por ${data.solicitadoPor} a las ${data.horaSolicitud}. Pulsa para confirmar tu identidad.`;
+                    estadoFoto.textContent = "Esperando captura...";
+                } else if (data.estado === "enviada") {
+                    bloque.classList.add("hidden");
+                    estadoFoto.textContent = `Foto enviada a las ${data.horaRespuesta}.`;
+                }
+            });
+        }
+
+        function escucharEstadoVerificacionMonitor(idTexto, idImg) {
+            db.ref('verificacion_identidad').on('value', (snapshot) => {
+                const elTexto = document.getElementById(idTexto);
+                const elImg = document.getElementById(idImg);
+                if (!elTexto || !elImg) return;
+
+                const data = snapshot.val();
+                if (!data) {
+                    elTexto.textContent = "Sin solicitudes recientes.";
+                    elImg.classList.add("hidden");
+                    elImg.src = "";
+                    return;
+                }
+
+                if (data.estado === "pendiente") {
+                    elTexto.textContent = `⏳ Solicitud enviada a las ${data.horaSolicitud}. Esperando foto del oficial...`;
+                    elImg.classList.add("hidden");
+                } else if (data.estado === "enviada" && data.fotoBase64) {
+                    elTexto.textContent = `✅ Foto recibida a las ${data.horaRespuesta} (Usuario: ${data.respondidoPor || "oficial"})`;
+                    elImg.src = data.fotoBase64;
+                    elImg.classList.remove("hidden");
+                }
+            });
+        }
+
+        async function tomarFotoVerificacion() {
+            const btnFoto = document.getElementById("btn-tomar-foto-verificacion");
+            const estadoFoto = document.getElementById("estado-foto-oficial");
+            if (btnFoto) btnFoto.disabled = true;
+            if (estadoFoto) estadoFoto.textContent = "Abriendo cámara para captura...";
+
+            let streamFoto = null;
+            try {
+                try {
+                    streamFoto = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                } catch (e) {
+                    streamFoto = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                }
+
+                const tempVideo = document.createElement("video");
+                tempVideo.srcObject = streamFoto;
+                tempVideo.muted = true;
+                tempVideo.playsInline = true;
+                await tempVideo.play();
+
+                await new Promise((resolve) => setTimeout(resolve, 400));
+
+                const canvas = document.createElement("canvas");
+                const ancho = 480;
+                const alto = tempVideo.videoHeight && tempVideo.videoWidth
+                    ? Math.round((tempVideo.videoHeight / tempVideo.videoWidth) * ancho)
+                    : 480;
+
+                canvas.width = ancho;
+                canvas.height = alto;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(tempVideo, 0, 0, ancho, alto);
+
+                const fotoBase64 = canvas.toDataURL("image/jpeg", 0.6);
+
+                db.ref('verificacion_identidad').update({
+                    estado: "enviada",
+                    fotoBase64: fotoBase64,
+                    horaRespuesta: new Date().toLocaleTimeString(),
+                    respondidoPor: usuarioActivo || "oficial"
+                });
+
+                if (estadoFoto) estadoFoto.textContent = "✅ Foto de verificación enviada.";
+            } catch (err) {
+                alert("No se pudo capturar la foto de verificación. Verifica los permisos de cámara.");
+                if (estadoFoto) estadoFoto.textContent = "Error al capturar foto.";
+            } finally {
+                if (streamFoto) {
+                    streamFoto.getTracks().forEach(track => track.stop());
+                }
+                if (btnFoto) btnFoto.disabled = false;
+            }
         }
 
         // ================= LÓGICA DEL OFICIAL =================
@@ -747,6 +932,7 @@
             if (confirm("⚠️ ¿Estás seguro de que deseas borrar TODOS los recorridos guardados y reiniciar el sistema por completo? Esta acción no se puede deshacer.")) {
                 db.ref('recorridos_archivados').remove();
                 db.ref('recorrido_activo').remove();
+                db.ref('verificacion_identidad').remove();
                 alert("🧹 ¡Historial limpiado con éxito!");
             }
         }
