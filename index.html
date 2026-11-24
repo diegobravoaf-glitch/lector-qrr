@@ -432,7 +432,6 @@
         let siguienteEsperado = 1;
         let listaDispositivos = [];
         let flujoActual = null;
-        let huboErroresEnRecorrido = false;
         let recorridoFinalizado = false;
         let puntosValidados = [];
         let temporizadorAvisoDuplicado = null;
@@ -546,26 +545,20 @@
                             historial: historial,
                             puntosValidados: puntosValidados,
                             finalizado: true,
-                            errores: huboErroresEnRecorrido
+                            errores: false
                         };
                         db.ref('recorrido_activo').set(estado);
                         renderizarTablaOficial(historial);
 
-                        const esPerfecto = !huboErroresEnRecorrido;
                         db.ref('recorridos_archivados').push({
                             fecha: new Date().toLocaleString(),
-                            exitoso: esPerfecto,
+                            exitoso: true,
                             historial: historial
                         });
 
                         mensajeFinal.style.display = "block";
-                        if (esPerfecto) {
-                            mensajeFinal.className = "bg-exito";
-                            mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
-                        } else {
-                            mensajeFinal.className = "bg-error";
-                            mensajeFinal.innerHTML = "❌ Negativo: El recorrido llegó al final pero tuvo lecturas incorrectas.";
-                        }
+                        mensajeFinal.className = "bg-exito";
+                        mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron!`;
                     });
                     return;
                 } else {
@@ -573,9 +566,9 @@
                     txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado);
                 }
             } else {
+                // Marca como Incorrecto en la tabla y bloquea el avance hasta leer el punto esperado
                 resultadoTexto = "Incorrecto";
                 claseResultado = "invalido";
-                huboErroresEnRecorrido = true;
             }
 
             const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
@@ -592,7 +585,7 @@
                     historial: historial,
                     puntosValidados: puntosValidados,
                     finalizado: recorridoFinalizado,
-                    errores: huboErroresEnRecorrido
+                    errores: false
                 };
 
                 db.ref('recorrido_activo').set(estado);
@@ -612,14 +605,13 @@
         function completarYArchivarRecorrido(esExitoso) {
             mensajeFinal.style.display = "block";
             const fechaHora = new Date().toLocaleString();
-            const estadoExito = esExitoso && !huboErroresEnRecorrido;
 
-            if (estadoExito) {
+            if (esExitoso) {
                 mensajeFinal.className = "bg-exito";
-                mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron de forma perfecta!`;
+                mensajeFinal.innerHTML = `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron!`;
             } else {
                 mensajeFinal.className = "bg-error";
-                mensajeFinal.innerHTML = "❌ Negativo: El recorrido finalizó con errores o saltos de puntos.";
+                mensajeFinal.innerHTML = "❌ Negativo: El recorrido finalizó sin completar todos los puntos.";
             }
 
             db.ref('recorrido_activo').once('value').then(snapshot => {
@@ -627,13 +619,13 @@
                 if (datosActivos && datosActivos.historial && datosActivos.historial.length > 0) {
                     db.ref('recorridos_archivados').push({
                         fecha: fechaHora,
-                        exitoso: estadoExito,
+                        exitoso: esExitoso,
                         historial: datosActivos.historial
                     });
                 }
             });
 
-            db.ref('recorrido_activo').update({ finalizado: true, errores: !estadoExito });
+            db.ref('recorrido_activo').update({ finalizado: true, errores: !esExitoso });
         }
 
         function cargarEstadoNubeOficial() {
@@ -642,15 +634,15 @@
                 if (estado) {
                     siguienteEsperado = estado.esperado || 1;
                     recorridoFinalizado = estado.finalizado || false;
-                    huboErroresEnRecorrido = estado.errores || false;
                     puntosValidados = Array.isArray(estado.puntosValidados) ? estado.puntosValidados : [];
                     txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado);
                     if (estado.historial) renderizarTablaOficial(estado.historial);
 
                     if (recorridoFinalizado) {
+                        const completo = siguienteEsperado > TOTAL_PUNTOS;
                         mensajeFinal.style.display = "block";
-                        mensajeFinal.className = huboErroresEnRecorrido ? "bg-error" : "bg-exito";
-                        mensajeFinal.innerHTML = huboErroresEnRecorrido ? "❌ Negativo: El recorrido finalizó con errores o saltos." : "✅ Bien: ¡Recorrido completado perfectamente!";
+                        mensajeFinal.className = completo ? "bg-exito" : "bg-error";
+                        mensajeFinal.innerHTML = completo ? `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron!` : "❌ Negativo: El recorrido finalizó sin completar todos los puntos.";
                     }
                 } else {
                     puntosValidados = [];
@@ -662,8 +654,8 @@
         btnFinalizar.addEventListener('click', () => {
             if (recorridoFinalizado) return;
             recorridoFinalizado = true;
-            const esPerfecto = (siguienteEsperado > TOTAL_PUNTOS && !huboErroresEnRecorrido);
-            completarYArchivarRecorrido(esPerfecto);
+            const completo = siguienteEsperado > TOTAL_PUNTOS;
+            completarYArchivarRecorrido(completo);
         });
 
         btnIniciar.addEventListener('click', () => arrancarCamara(selectorCamara.value));
@@ -672,7 +664,6 @@
         btnReiniciar.addEventListener('click', () => {
             db.ref('recorrido_activo').remove();
             siguienteEsperado = 1;
-            huboErroresEnRecorrido = false;
             recorridoFinalizado = false;
             puntosValidados = [];
             txtEsperado.innerText = obtenerEtiquetaPunto(1);
@@ -707,9 +698,10 @@
 
                 const supMensajeFinal = document.getElementById('supervisor-mensaje-final');
                 if (estado.finalizado) {
+                    const completo = (estado.esperado || 1) > TOTAL_PUNTOS;
                     supMensajeFinal.style.display = "block";
-                    supMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    supMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
+                    supMensajeFinal.className = completo ? "bg-exito" : "bg-error";
+                    supMensajeFinal.innerHTML = completo ? `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron!` : "❌ Negativo: El recorrido finalizó sin completar todos los puntos.";
                 } else {
                     supMensajeFinal.style.display = "none";
                 }
@@ -741,9 +733,10 @@
 
                 const saMensajeFinal = document.getElementById('superadmin-mensaje-final');
                 if (estado.finalizado) {
+                    const completo = (estado.esperado || 1) > TOTAL_PUNTOS;
                     saMensajeFinal.style.display = "block";
-                    saMensajeFinal.className = estado.errores ? "bg-error" : "bg-exito";
-                    saMensajeFinal.innerHTML = estado.errores ? "❌ Negativo: El recorrido finalizó con errores." : "✅ Bien: ¡Recorrido completado perfectamente!";
+                    saMensajeFinal.className = completo ? "bg-exito" : "bg-error";
+                    saMensajeFinal.innerHTML = completo ? `✅ Bien: ¡Los ${TOTAL_PUNTOS} puntos del recorrido se completaron!` : "❌ Negativo: El recorrido finalizó sin completar todos los puntos.";
                 } else {
                     saMensajeFinal.style.display = "none";
                 }
