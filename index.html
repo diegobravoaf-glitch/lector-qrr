@@ -69,6 +69,18 @@
         .info-secuencia { font-size: 1.3rem; margin: 10px 0; font-weight: bold; color: #fff; }
         #numero-esperado, #supervisor-esperado, #superadmin-esperado { color: #00d4ff; font-size: 1.5rem; display: block; margin-top: 4px; }
 
+        .aviso-duplicado {
+            margin: 10px auto;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background-color: #3a3216;
+            color: #ffe066;
+            border: 1px solid #8c7319;
+            font-size: 0.95rem;
+            font-weight: bold;
+            display: none;
+        }
+
         .controles {
             margin: 15px 0;
             display: flex;
@@ -189,6 +201,8 @@
         <div class="info-secuencia">
             Siguiente esperado: <span id="numero-esperado">1/31: AZOTEA</span>
         </div>
+
+        <div id="aviso-ya-validado" class="aviso-duplicado"></div>
 
         <div class="controles">
             <button id="btn-iniciar">Encender Cámara</button>
@@ -420,6 +434,8 @@
         let flujoActual = null;
         let huboErroresEnRecorrido = false;
         let recorridoFinalizado = false;
+        let puntosValidados = [];
+        let temporizadorAvisoDuplicado = null;
 
         const video = document.getElementById('video-feed');
         const btnIniciar = document.getElementById('btn-iniciar');
@@ -429,8 +445,19 @@
         const btnReiniciar = document.getElementById('btn-reiniciar');
         const btnFinalizar = document.getElementById('btn-finalizar');
         const mensajeFinal = document.getElementById('mensaje-resultado-final');
+        const avisoYaValidado = document.getElementById('aviso-ya-validado');
 
         const detectorCodigos = new BarcodeDetector({ formats: ['qr_code'] });
+
+        function mostrarAvisoDuplicado(texto) {
+            if (!avisoYaValidado) return;
+            avisoYaValidado.textContent = texto;
+            avisoYaValidado.style.display = "block";
+            if (temporizadorAvisoDuplicado) clearTimeout(temporizadorAvisoDuplicado);
+            temporizadorAvisoDuplicado = setTimeout(() => {
+                avisoYaValidado.style.display = "none";
+            }, 2500);
+        }
 
         async function obtenerCamaras() {
             try {
@@ -484,8 +511,15 @@
             ultimoCodigoLeido = textoQR;
             tiempoUltimoEscaneo = ahoraTiempo;
 
-            const horaFormateada = new Date().toLocaleTimeString();
             const qrNormalizado = textoQR.trim().toUpperCase();
+
+            // Si este QR ya fue validado en esta misma ronda, bloquear re-escaneo sin marcar error
+            if (puntosValidados.includes(qrNormalizado)) {
+                mostrarAvisoDuplicado(`ℹ️ "${qrNormalizado}" ya fue validado en esta ronda. Continúa con: ${obtenerEtiquetaPunto(siguienteEsperado)}`);
+                return;
+            }
+
+            const horaFormateada = new Date().toLocaleTimeString();
             const puntoEsperado = PUNTOS_RECORRIDO[siguienteEsperado - 1];
 
             let resultadoTexto = "";
@@ -494,6 +528,7 @@
             if (siguienteEsperado <= TOTAL_PUNTOS && qrNormalizado === puntoEsperado) {
                 resultadoTexto = "Válido";
                 claseResultado = "valido";
+                puntosValidados.push(qrNormalizado);
 
                 const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
 
@@ -509,6 +544,7 @@
                         const estado = {
                             esperado: siguienteEsperado,
                             historial: historial,
+                            puntosValidados: puntosValidados,
                             finalizado: true,
                             errores: huboErroresEnRecorrido
                         };
@@ -554,6 +590,7 @@
                 const estado = {
                     esperado: siguienteEsperado,
                     historial: historial,
+                    puntosValidados: puntosValidados,
                     finalizado: recorridoFinalizado,
                     errores: huboErroresEnRecorrido
                 };
@@ -606,6 +643,7 @@
                     siguienteEsperado = estado.esperado || 1;
                     recorridoFinalizado = estado.finalizado || false;
                     huboErroresEnRecorrido = estado.errores || false;
+                    puntosValidados = Array.isArray(estado.puntosValidados) ? estado.puntosValidados : [];
                     txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado);
                     if (estado.historial) renderizarTablaOficial(estado.historial);
 
@@ -615,6 +653,7 @@
                         mensajeFinal.innerHTML = huboErroresEnRecorrido ? "❌ Negativo: El recorrido finalizó con errores o saltos." : "✅ Bien: ¡Recorrido completado perfectamente!";
                     }
                 } else {
+                    puntosValidados = [];
                     txtEsperado.innerText = obtenerEtiquetaPunto(1);
                 }
             });
@@ -635,9 +674,11 @@
             siguienteEsperado = 1;
             huboErroresEnRecorrido = false;
             recorridoFinalizado = false;
+            puntosValidados = [];
             txtEsperado.innerText = obtenerEtiquetaPunto(1);
             tablaHistorial.innerHTML = '';
             ultimoCodigoLeido = null;
+            if (avisoYaValidado) avisoYaValidado.style.display = "none";
             mensajeFinal.style.display = "none";
         });
 
