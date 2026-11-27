@@ -428,21 +428,21 @@
         };
 
         // ================= GENERADOR DE CORRELATIVOS =================
+        // Genera: PREFIJO 01, PREFIJO 02 ... hasta PREFIJO N (con mínimo 2 dígitos)
         function generarPuntosCorrelativos(prefijo, cantidad) {
             const lista = [];
-            const anchoDigitos = String(cantidad).length;
             for (let i = 1; i <= cantidad; i++) {
-                const numeroFormateado = String(i).padStart(anchoDigitos, "0");
-                lista.push(`${prefijo} - PUNTO ${numeroFormateado}`);
+                const numeroFormateado = String(i).padStart(2, "0");
+                lista.push(`${prefijo} ${numeroFormateado}`);
             }
             return lista;
         }
 
         // ================= PUNTOS POR COMPLEJO =================
         // Caracas: 31 puntos originales
-        // Valencia: PUNTO 01 al PUNTO 80
-        // Morón: PUNTO 01 al PUNTO 120
-        // Zulia: PUNTO 01 al PUNTO 200
+        // Valencia: VALENCIA 01 hasta VALENCIA 80
+        // Morón: MORON 01 hasta MORON 120
+        // Zulia: ZULIA 01 hasta ZULIA 200
         const PUNTOS_POR_COMPLEJO = {
             caracas: [
                 "AZOTEA",
@@ -516,6 +516,15 @@
             }
             const indice = Math.max(0, numeroPaso - 1);
             return `${numeroPaso}/${total}: ${lista[indice]}`;
+        }
+
+        // Normaliza texto para comparar sin errores por mayúsculas o espacios extra (ej. "MORON 02" == "MORON02")
+        function normalizarCodigoQR(texto) {
+            return String(texto || "").trim().toUpperCase().replace(/\s+/g, " ");
+        }
+
+        function normalizarSinEspacios(texto) {
+            return String(texto || "").trim().toUpperCase().replace(/\s+/g, "");
         }
 
         function limpiarListenersFirebase() {
@@ -713,6 +722,8 @@
         let recorridoFinalizado = false;
         let puntosValidados = [];
         let temporizadorAvisoDuplicado = null;
+        let ultimoCodigoLeido = "";
+        let tiempoUltimoEscaneo = 0;
 
         const video = document.getElementById('video-feed');
         const btnIniciar = document.getElementById('btn-iniciar');
@@ -724,7 +735,9 @@
         const mensajeFinal = document.getElementById('mensaje-resultado-final');
         const avisoYaValidado = document.getElementById('aviso-ya-validado');
 
-        const detectorCodigos = new BarcodeDetector({ formats: ['qr_code'] });
+        const detectorCodigos = ('BarcodeDetector' in window)
+            ? new BarcodeDetector({ formats: ['qr_code'] })
+            : null;
 
         function mostrarAvisoDuplicado(texto) {
             if (!avisoYaValidado) return;
@@ -755,6 +768,10 @@
         }
 
         async function arrancarCamara(deviceId = null) {
+            if (!detectorCodigos) {
+                alert("Este navegador no soporta BarcodeDetector nativo. Usa Google Chrome o Edge actualizado.");
+                return;
+            }
             if (flujoActual) flujoActual.getTracks().forEach(track => track.stop());
             const opcionesControles = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: { facingMode: 'environment' } };
             try {
@@ -763,285 +780,262 @@
                 btnIniciar.style.display = 'none';
                 await obtenerCamaras();
                 escanearFotograma();
-            } catch (err) { alert("Error al acceder a la cámara."); }
+            } catch (err) {
+                alert("No se pudo acceder a la cámara. Verifica los permisos y que estés usando HTTPS.");
+            }
         }
 
         async function escanearFotograma() {
-            if (document.getElementById('app-section').classList.contains('hidden') || recorridoFinalizado) return;
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            if (!flujoActual) return;
+            if (video.readyState === video.HAVE_ENOUGH_DATA && !recorridoFinalizado) {
                 try {
                     const codigos = await detectorCodigos.detect(video);
-                    if (codigos.length > 0) procesarQR(codigos[0].rawValue);
-                } catch (e) {}
+                    if (codigos.length > 0) {
+                        procesarCodigoQR(codigos[0].rawValue);
+                    }
+                } catch (e) {
+                    console.error("Error leyendo QR:", e);
+                }
             }
             requestAnimationFrame(escanearFotograma);
         }
 
-        let ultimoCodigoLeido = null;
-        let tiempoUltimoEscaneo = 0;
-
-        function procesarQR(textoQR) {
+        function procesarCodigoQR(valorCrudo) {
             if (recorridoFinalizado) return;
-            const ahoraTiempo = Date.now();
-            if (textoQR === ultimoCodigoLeido && (ahoraTiempo - tiempoUltimoEscaneo) < 2000) return;
 
-            ultimoCodigoLeido = textoQR;
-            tiempoUltimoEscaneo = ahoraTiempo;
+            const ahora = Date.now();
+            const codigoLimpio = normalizarCodigoQR(valorCrudo);
+            const codigoSinEspacios = normalizarSinEspacios(valorCrudo);
 
-            const qrNormalizado = textoQR.trim().toUpperCase();
-            const puntosComplejo = obtenerListaPuntos(complejoOficial);
-            const totalPuntosComplejo = puntosComplejo.length;
+            // Evita lecturas repetidas en menos de 1.8 segundos del mismo código
+            if (codigoSinEspacios === ultimoCodigoLeido && (ahora - tiempoUltimoEscaneo) < 1800) {
+                return;
+            }
+            ultimoCodigoLeido = codigoSinEspacios;
+            tiempoUltimoEscaneo = ahora;
 
-            if (puntosValidados.includes(qrNormalizado)) {
-                mostrarAvisoDuplicado(`"${qrNormalizado}" ya fue validado en esta ronda. Continúa con: ${obtenerEtiquetaPunto(siguienteEsperado, complejoOficial)}`);
+            const listaPuntos = obtenerListaPuntos(complejoOficial);
+            const totalPuntos = listaPuntos.length;
+
+            if (siguienteEsperado > totalPuntos) {
+                mostrarAvisoDuplicado("El recorrido ya completó todos los puntos.");
                 return;
             }
 
-            const horaFormateada = new Date().toLocaleTimeString();
-            const puntoEsperado = puntosComplejo[siguienteEsperado - 1];
-
-            let resultadoTexto = "";
-            let claseResultado = "";
-
-            if (siguienteEsperado <= totalPuntosComplejo && qrNormalizado === puntoEsperado) {
-                resultadoTexto = "Válido";
-                claseResultado = "valido";
-                puntosValidados.push(qrNormalizado);
-
-                const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
-
-                if (siguienteEsperado === totalPuntosComplejo) {
-                    recorridoFinalizado = true;
-                    siguienteEsperado++;
-                    txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado, complejoOficial);
-
-                    db.ref(`recorrido_activo/${complejoOficial}/historial`).once('value').then((snapshot) => {
-                        let historial = snapshot.val() || [];
-                        historial.unshift(nuevaFilaDatos);
-
-                        const estado = {
-                            esperado: siguienteEsperado,
-                            historial: historial,
-                            puntosValidados: puntosValidados,
-                            finalizado: true,
-                            errores: false,
-                            operador: usuarioActivo
-                        };
-                        db.ref(`recorrido_activo/${complejoOficial}`).set(estado);
-                        renderizarTablaOficial(historial);
-
-                        db.ref(`recorridos_archivados/${complejoOficial}`).push({
-                            fecha: new Date().toLocaleString(),
-                            exitoso: true,
-                            operador: usuarioActivo,
-                            historial: historial
-                        });
-
-                        mensajeFinal.style.display = "block";
-                        mensajeFinal.className = "bg-exito";
-                        mensajeFinal.innerHTML = `Bien: ¡Los ${totalPuntosComplejo} puntos de ${NOMBRES_COMPLEJOS[complejoOficial]} se completaron!`;
-                    });
-                    return;
-                } else {
-                    siguienteEsperado++;
-                    txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado, complejoOficial);
-                }
-            } else {
-                resultadoTexto = "Incorrecto";
-                claseResultado = "invalido";
+            // Verificar si el punto ya fue validado en este recorrido
+            const yaValidado = puntosValidados.some(p => normalizarSinEspacios(p) === codigoSinEspacios);
+            if (yaValidado) {
+                mostrarAvisoDuplicado(`El punto "${codigoLimpio}" ya fue validado en este recorrido.`);
+                return;
             }
 
-            const nuevaFilaDatos = { hora: horaFormateada, qr: textoQR.trim(), resultado: resultadoTexto, clase: claseResultado };
-            sincronizarANube(nuevaFilaDatos);
-        }
+            const puntoEsperadoTexto = listaPuntos[siguienteEsperado - 1];
+            const esperadoSinEspacios = normalizarSinEspacios(puntoEsperadoTexto);
+            const horaActual = new Date().toLocaleTimeString();
 
-        function sincronizarANube(nuevaFila) {
-            db.ref(`recorrido_activo/${complejoOficial}/historial`).once('value').then((snapshot) => {
-                let historial = snapshot.val() || [];
-                historial.unshift(nuevaFila);
+            // Coincidencia exacta (tolerando espacios como "MORON 02" o "MORON02")
+            const esValido = (codigoSinEspacios === esperadoSinEspacios);
 
-                const estado = {
-                    esperado: siguienteEsperado,
-                    historial: historial,
-                    puntosValidados: puntosValidados,
-                    finalizado: recorridoFinalizado,
-                    errores: false,
-                    operador: usuarioActivo
-                };
+            const registro = {
+                hora: horaActual,
+                qr: codigoLimpio,
+                valido: esValido,
+                paso: siguienteEsperado
+            };
 
-                db.ref(`recorrido_activo/${complejoOficial}`).set(estado);
-                renderizarTablaOficial(historial);
-            });
-        }
-
-        function renderizarTablaOficial(historial) {
-            tablaHistorial.innerHTML = '';
-            historial.forEach(item => {
-                const nuevaFila = document.createElement('tr');
-                nuevaFila.innerHTML = `<td>${item.hora}</td><td>${item.qr}</td><td class="${item.clase}">${item.resultado}</td>`;
-                tablaHistorial.appendChild(nuevaFila);
-            });
-        }
-
-        function completarYArchivarRecorrido(esExitoso) {
-            const totalPuntosComplejo = obtenerListaPuntos(complejoOficial).length;
-            mensajeFinal.style.display = "block";
-            const fechaHora = new Date().toLocaleString();
-
-            if (esExitoso) {
-                mensajeFinal.className = "bg-exito";
-                mensajeFinal.innerHTML = `Bien: ¡Los ${totalPuntosComplejo} puntos de ${NOMBRES_COMPLEJOS[complejoOficial]} se completaron!`;
-            } else {
-                mensajeFinal.className = "bg-error";
-                mensajeFinal.innerHTML = "Negativo: El recorrido finalizó sin completar todos los puntos.";
+            if (esValido) {
+                puntosValidados.push(puntoEsperadoTexto);
+                siguienteEsperado++;
             }
 
-            db.ref(`recorrido_activo/${complejoOficial}`).once('value').then(snapshot => {
-                const datosActivos = snapshot.val();
-                if (datosActivos && datosActivos.historial && datosActivos.historial.length > 0) {
-                    db.ref(`recorridos_archivados/${complejoOficial}`).push({
-                        fecha: fechaHora,
-                        exitoso: esExitoso,
-                        operador: usuarioActivo,
-                        historial: datosActivos.historial
-                    });
-                }
+            // Guardar en Firebase bajo el complejo del oficial
+            const refActivo = db.ref(`recorrido_activo/${complejoOficial}`);
+            refActivo.child("historial").push(registro);
+            refActivo.update({
+                siguienteEsperado: siguienteEsperado,
+                puntosValidados: puntosValidados,
+                complejo: complejoOficial,
+                oficial: usuarioActivo
             });
 
-            db.ref(`recorrido_activo/${complejoOficial}`).update({ finalizado: true, errores: !esExitoso });
+            // Si completó el último punto automáticamente
+            if (siguienteEsperado > totalPuntos) {
+                finalizarRecorridoActual(true);
+            }
         }
 
         function cargarEstadoNubeOficial() {
             if (refActivoActual) refActivoActual.off();
             refActivoActual = db.ref(`recorrido_activo/${complejoOficial}`);
-            const totalPuntosComplejo = obtenerListaPuntos(complejoOficial).length;
 
             refActivoActual.on('value', (snapshot) => {
-                const estado = snapshot.val();
-                if (estado) {
-                    siguienteEsperado = estado.esperado || 1;
-                    recorridoFinalizado = estado.finalizado || false;
-                    puntosValidados = Array.isArray(estado.puntosValidados) ? estado.puntosValidados : [];
-                    txtEsperado.innerText = obtenerEtiquetaPunto(siguienteEsperado, complejoOficial);
-                    if (estado.historial) renderizarTablaOficial(estado.historial);
+                if (rolActivo !== "oficial") return;
+                const data = snapshot.val() || {};
+                const listaPuntos = obtenerListaPuntos(complejoOficial);
 
-                    if (recorridoFinalizado) {
-                        const completo = siguienteEsperado > totalPuntosComplejo;
-                        mensajeFinal.style.display = "block";
-                        mensajeFinal.className = completo ? "bg-exito" : "bg-error";
-                        mensajeFinal.innerHTML = completo
-                            ? `Bien: ¡Los ${totalPuntosComplejo} puntos de ${NOMBRES_COMPLEJOS[complejoOficial]} se completaron!`
-                            : "Negativo: El recorrido finalizó sin completar todos los puntos.";
-                    }
+                siguienteEsperado = data.siguienteEsperado || 1;
+                recorridoFinalizado = Boolean(data.finalizado);
+                puntosValidados = Array.isArray(data.puntosValidados) ? data.puntosValidados : [];
+
+                txtEsperado.textContent = obtenerEtiquetaPunto(siguienteEsperado, complejoOficial);
+
+                // Renderizar tabla actual
+                tablaHistorial.innerHTML = "";
+                if (data.historial) {
+                    const entradas = Object.values(data.historial);
+                    entradas.reverse().forEach(item => {
+                        const fila = document.createElement("tr");
+                        fila.innerHTML = `
+                            <td>${item.hora}</td>
+                            <td>${item.qr}</td>
+                            <td class="${item.valido ? 'valido' : 'invalido'}">${item.valido ? 'VÁLIDO' : 'FUERA DE SECUENCIA'}</td>
+                        `;
+                        tablaHistorial.appendChild(fila);
+                    });
+                }
+
+                // Mensaje final si está cerrado
+                if (recorridoFinalizado) {
+                    const exito = siguienteEsperado > listaPuntos.length;
+                    mensajeFinal.style.display = "block";
+                    mensajeFinal.className = exito ? "bg-exito" : "bg-error";
+                    mensajeFinal.textContent = exito
+                        ? `Recorrido COMPLETADO con éxito (${listaPuntos.length}/${listaPuntos.length} puntos).`
+                        : `Recorrido FINALIZADO incompleto (${puntosValidados.length}/${listaPuntos.length} puntos).`;
                 } else {
-                    puntosValidados = [];
-                    txtEsperado.innerText = obtenerEtiquetaPunto(1, complejoOficial);
+                    mensajeFinal.style.display = "none";
                 }
             });
         }
 
-        function cargarHistorialArchivadoOficial() {
-            if (refArchivadosActual) refArchivadosActual.off();
-            refArchivadosActual = db.ref(`recorridos_archivados/${complejoOficial}`);
-            renderizarAcordeonDesdeRef(refArchivadosActual, "contenedor-acordeon-oficial");
+        function finalizarRecorridoActual(esAutomatico = false) {
+            const listaPuntos = obtenerListaPuntos(complejoOficial);
+            const totalPuntos = listaPuntos.length;
+            const completadoTotal = siguienteEsperado > totalPuntos;
+
+            if (!esAutomatico && !completadoTotal) {
+                const confirmar = confirm(`Faltan puntos por escanear (${puntosValidados.length}/${totalPuntos}). ¿Deseas finalizar y guardar el recorrido como INCOMPLETO?`);
+                if (!confirmar) return;
+            }
+
+            db.ref(`recorrido_activo/${complejoOficial}`).once('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                const historialLista = data.historial ? Object.values(data.historial) : [];
+                const fechaHora = new Date().toLocaleString();
+
+                const resumenArchivado = {
+                    fecha: fechaHora,
+                    complejo: complejoOficial,
+                    oficial: usuarioActivo,
+                    completado: completadoTotal,
+                    puntosLogrados: puntosValidados.length,
+                    totalPuntos: totalPuntos,
+                    historial: historialLista
+                };
+
+                db.ref(`historial_recorridos/${complejoOficial}`).push(resumenArchivado);
+                db.ref(`recorrido_activo/${complejoOficial}`).update({
+                    finalizado: true,
+                    completado: completadoTotal
+                });
+            });
         }
 
-        btnFinalizar.addEventListener('click', () => {
-            if (recorridoFinalizado) return;
-            recorridoFinalizado = true;
-            const totalPuntosComplejo = obtenerListaPuntos(complejoOficial).length;
-            const completo = siguienteEsperado > totalPuntosComplejo;
-            completarYArchivarRecorrido(completo);
-        });
+        function reiniciarRecorridoActual() {
+            const confirmar = confirm("¿Seguro que deseas reiniciar el recorrido actual desde el Punto 1?");
+            if (!confirmar) return;
 
-        btnIniciar.addEventListener('click', () => arrancarCamara(selectorCamara.value));
-        selectorCamara.addEventListener('change', () => arrancarCamara(selectorCamara.value));
-
-        btnReiniciar.addEventListener('click', () => {
-            db.ref(`recorrido_activo/${complejoOficial}`).remove();
             siguienteEsperado = 1;
             recorridoFinalizado = false;
             puntosValidados = [];
-            txtEsperado.innerText = obtenerEtiquetaPunto(1, complejoOficial);
-            tablaHistorial.innerHTML = '';
-            ultimoCodigoLeido = null;
-            if (avisoYaValidado) avisoYaValidado.style.display = "none";
-            mensajeFinal.style.display = "none";
-        });
+            ultimoCodigoLeido = "";
 
-        // ================= MÓDULOS DE COMPLEJOS PARA SUPERVISOR Y SUPER ADMIN =================
-        function actualizarBotonesComplejo() {
-            const complejos = ["caracas", "moron", "zulia", "valencia"];
-            complejos.forEach((comp) => {
-                const btnSup = document.getElementById(`sup-btn-${comp}`);
-                const btnSa = document.getElementById(`sa-btn-${comp}`);
-                if (btnSup) btnSup.classList.toggle("activo", comp === complejoMonitor);
-                if (btnSa) btnSa.classList.toggle("activo", comp === complejoMonitor);
+            db.ref(`recorrido_activo/${complejoOficial}`).set({
+                siguienteEsperado: 1,
+                finalizado: false,
+                completado: false,
+                puntosValidados: [],
+                historial: null,
+                complejo: complejoOficial,
+                oficial: usuarioActivo
             });
-
-            const titSup = document.getElementById("supervisor-titulo-complejo");
-            const titSa = document.getElementById("superadmin-titulo-complejo");
-            if (titSup) titSup.textContent = NOMBRES_COMPLEJOS[complejoMonitor];
-            if (titSa) titSa.textContent = NOMBRES_COMPLEJOS[complejoMonitor];
         }
 
+        btnIniciar.addEventListener('click', () => arrancarCamara(selectorCamara.value || null));
+        selectorCamara.addEventListener('change', (e) => arrancarCamara(e.target.value));
+        btnFinalizar.addEventListener('click', () => finalizarRecorridoActual(false));
+        btnReiniciar.addEventListener('click', reiniciarRecorridoActual);
+
+        // ================= MONITOREO DE SUPERVISORES Y SUPER ADMIN =================
         function seleccionarComplejoMonitor(complejo) {
             complejoMonitor = complejo;
-            actualizarBotonesComplejo();
+
+            // Actualizar botones activos en Supervisor y SuperAdmin
+            ["caracas", "moron", "zulia", "valencia"].forEach(comp => {
+                const btnSup = document.getElementById(`sup-btn-${comp}`);
+                const btnSa = document.getElementById(`sa-btn-${comp}`);
+                if (btnSup) btnSup.classList.toggle("activo", comp === complejo);
+                if (btnSa) btnSa.classList.toggle("activo", comp === complejo);
+            });
+
+            const nombreVisible = NOMBRES_COMPLEJOS[complejo];
+            const elTituloSup = document.getElementById("supervisor-titulo-complejo");
+            const elTituloSa = document.getElementById("superadmin-titulo-complejo");
+            if (elTituloSup) elTituloSup.textContent = nombreVisible;
+            if (elTituloSa) elTituloSa.textContent = nombreVisible;
 
             if (rolActivo === "supervisor") {
-                iniciarMonitoreoComplejo("supervisor-esperado", "supervisor-tabla-historial", "supervisor-mensaje-final");
                 escucharEstadoVerificacionMonitor("estado-verificacion-supervisor", "foto-verificacion-supervisor");
-                if (refArchivadosActual) refArchivadosActual.off();
-                refArchivadosActual = db.ref(`recorridos_archivados/${complejoMonitor}`);
-                renderizarAcordeonDesdeRef(refArchivadosActual, "contenedor-acordeon-supervisores");
+                escucharMonitoreoEnVivo("supervisor-esperado", "supervisor-tabla-historial", "supervisor-mensaje-final");
+                cargarHistorialArchivadoMonitor("contenedor-acordeon-supervisores");
             } else if (rolActivo === "superadmin") {
-                iniciarMonitoreoComplejo("superadmin-esperado", "superadmin-tabla-historial", "superadmin-mensaje-final");
                 escucharEstadoVerificacionMonitor("estado-verificacion-superadmin", "foto-verificacion-superadmin");
-                if (refArchivadosActual) refArchivadosActual.off();
-                refArchivadosActual = db.ref(`recorridos_archivados/${complejoMonitor}`);
-                renderizarAcordeonDesdeRef(refArchivadosActual, "contenedor-acordeon-superadmin");
+                escucharMonitoreoEnVivo("superadmin-esperado", "superadmin-tabla-historial", "superadmin-mensaje-final");
+                cargarHistorialArchivadoMonitor("contenedor-acordeon-superadmin");
             }
         }
 
-        function iniciarMonitoreoComplejo(idEsperado, idTabla, idMensaje) {
+        function escucharMonitoreoEnVivo(idEsperado, idTabla, idMensaje) {
             if (refActivoActual) refActivoActual.off();
             refActivoActual = db.ref(`recorrido_activo/${complejoMonitor}`);
-            const totalPuntosComplejo = obtenerListaPuntos(complejoMonitor).length;
 
             refActivoActual.on('value', (snapshot) => {
-                const estado = snapshot.val();
+                const data = snapshot.val() || {};
+                const listaPuntos = obtenerListaPuntos(complejoMonitor);
+                const pasoActual = data.siguienteEsperado || 1;
+                const finalizado = Boolean(data.finalizado);
+
                 const elEsperado = document.getElementById(idEsperado);
                 const elTabla = document.getElementById(idTabla);
                 const elMensaje = document.getElementById(idMensaje);
 
-                if (!estado) {
-                    if (elEsperado) elEsperado.innerText = obtenerEtiquetaPunto(1, complejoMonitor);
-                    if (elTabla) elTabla.innerHTML = "";
-                    if (elMensaje) elMensaje.style.display = "none";
-                    return;
+                if (elEsperado) {
+                    elEsperado.textContent = obtenerEtiquetaPunto(pasoActual, complejoMonitor);
                 }
 
-                if (elEsperado) elEsperado.innerText = obtenerEtiquetaPunto(estado.esperado || 1, complejoMonitor);
                 if (elTabla) {
-                    elTabla.innerHTML = '';
-                    if (estado.historial) {
-                        estado.historial.forEach(item => {
-                            const fila = document.createElement('tr');
-                            fila.innerHTML = `<td>${item.hora}</td><td>${item.qr}</td><td class="${item.clase}">${item.resultado}</td>`;
+                    elTabla.innerHTML = "";
+                    if (data.historial) {
+                        Object.values(data.historial).reverse().forEach(item => {
+                            const fila = document.createElement("tr");
+                            fila.innerHTML = `
+                                <td>${item.hora}</td>
+                                <td>${item.qr}</td>
+                                <td class="${item.valido ? 'valido' : 'invalido'}">${item.valido ? 'VÁLIDO' : 'FUERA DE SECUENCIA'}</td>
+                            `;
                             elTabla.appendChild(fila);
                         });
                     }
                 }
 
                 if (elMensaje) {
-                    if (estado.finalizado) {
-                        const completo = (estado.esperado || 1) > totalPuntosComplejo;
+                    if (finalizado) {
+                        const exito = pasoActual > listaPuntos.length;
                         elMensaje.style.display = "block";
-                        elMensaje.className = completo ? "bg-exito" : "bg-error";
-                        elMensaje.innerHTML = completo
-                            ? `Bien: ¡Los ${totalPuntosComplejo} puntos de ${NOMBRES_COMPLEJOS[complejoMonitor]} se completaron!`
-                            : "Negativo: El recorrido finalizó sin completar todos los puntos.";
+                        elMensaje.className = exito ? "bg-exito" : "bg-error";
+                        elMensaje.textContent = exito
+                            ? `Recorrido COMPLETADO (${listaPuntos.length}/${listaPuntos.length} puntos).`
+                            : `Recorrido FINALIZADO incompleto.`;
                     } else {
                         elMensaje.style.display = "none";
                     }
@@ -1049,79 +1043,89 @@
             });
         }
 
-        function limpiarHistorialComplejoActual() {
-            const nombreComp = NOMBRES_COMPLEJOS[complejoMonitor];
-            if (confirm(`¿Estás seguro de que deseas borrar el historial y el recorrido activo de ${nombreComp}? Esta acción no se puede deshacer.`)) {
-                db.ref(`recorridos_archivados/${complejoMonitor}`).remove();
-                db.ref(`recorrido_activo/${complejoMonitor}`).remove();
-                db.ref(`verificacion_identidad/${complejoMonitor}`).remove();
-                alert(`Historial de ${nombreComp} limpiado con éxito.`);
+        // ================= ACORDEONES DE HISTORIAL ARCHIVADO =================
+        function renderizarAcordeones(snapshot, idContenedor) {
+            const contenedor = document.getElementById(idContenedor);
+            if (!contenedor) return;
+
+            const data = snapshot.val();
+            if (!data) {
+                contenedor.innerHTML = `<p style="color: #adb5bd;">No hay recorridos guardados aún en ${NOMBRES_COMPLEJOS[rolActivo === 'oficial' ? complejoOficial : complejoMonitor]}.</p>`;
+                return;
             }
-        }
 
-        // ================= ACORDEÓN DE HISTORIAL =================
-        function renderizarAcordeonDesdeRef(refArch, elementId) {
-            refArch.on('value', (snapshot) => {
-                const contenedor = document.getElementById(elementId);
-                if (!contenedor) return;
-                contenedor.innerHTML = '';
+            contenedor.innerHTML = "";
+            const registros = Object.entries(data).reverse();
 
-                const data = snapshot.val();
-                if (!data) {
-                    contenedor.innerHTML = `<p style="color: #adb5bd;">No hay recorridos archivados en ${NOMBRES_COMPLEJOS[complejoMonitor] || NOMBRES_COMPLEJOS[complejoOficial]} todavía.</p>`;
-                    return;
+            registros.forEach(([key, rec]) => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "acordeon-item";
+
+                const etiquetaEstado = rec.completado
+                    ? `<span class="tag-resultado tag-exito">COMPLETADO (${rec.puntosLogrados}/${rec.totalPuntos})</span>`
+                    : `<span class="tag-resultado tag-error">INCOMPLETO (${rec.puntosLogrados}/${rec.totalPuntos})</span>`;
+
+                let filasHtml = "";
+                if (Array.isArray(rec.historial)) {
+                    rec.historial.forEach(h => {
+                        filasHtml += `
+                            <tr>
+                                <td>${h.hora}</td>
+                                <td>${h.qr}</td>
+                                <td class="${h.valido ? 'valido' : 'invalido'}">${h.valido ? 'VÁLIDO' : 'ERROR'}</td>
+                            </tr>
+                        `;
+                    });
                 }
 
-                const llaves = Object.keys(data).reverse();
-                let numeroRecorrido = llaves.length;
-
-                llaves.forEach((key) => {
-                    const item = data[key];
-                    const esExito = item.exitoso;
-                    const tagClass = esExito ? 'tag-exito' : 'tag-error';
-                    const tagTexto = esExito ? 'BIEN' : 'NEGATIVO';
-                    const etiquetaOp = item.operador ? ` · ${item.operador}` : '';
-
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'acordeon-item';
-
-                    let filasHTML = '';
-                    if (item.historial) {
-                        item.historial.forEach(reg => {
-                            filasHTML += `<tr><td>${reg.hora}</td><td>${reg.qr}</td><td class="${reg.clase}">${reg.resultado}</td></tr>`;
-                        });
-                    }
-
-                    const acordeonId = `${elementId}-${key}`;
-
-                    itemDiv.innerHTML = `
-                        <button class="acordeon-header" onclick="toggleAcordeon('${acordeonId}')">
-                            <span>Recorrido #${numeroRecorrido}${etiquetaOp} <small style="font-weight:normal; font-size:0.85rem; color:#adb5bd;">(${item.fecha})</small></span>
-                            <span class="tag-resultado ${tagClass}">${tagTexto}</span>
-                        </button>
-                        <div id="contenido-${acordeonId}" class="acordeon-contenido">
-                            <table>
-                                <thead>
-                                    <tr><th>Hora</th><th>QR</th><th>Resultado</th></tr>
-                                </thead>
-                                <tbody>
-                                    ${filasHTML}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-
-                    contenedor.appendChild(itemDiv);
-                    numeroRecorrido--;
-                });
+                itemDiv.innerHTML = `
+                    <button class="acordeon-header" onclick="this.nextElementSibling.classList.toggle('activo')">
+                        <span>${rec.fecha} (${rec.oficial || 'oficial'})</span>
+                        ${etiquetaEstado}
+                    </button>
+                    <div class="acordeon-contenido">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>QR</th>
+                                    <th>Resultado</th>
+                                </tr>
+                            </thead>
+                            <tbody>${filasHtml}</tbody>
+                        </table>
+                    </div>
+                `;
+                contenedor.appendChild(itemDiv);
             });
         }
 
-        function toggleAcordeon(id) {
-            const el = document.getElementById(`contenido-${id}`);
-            if (el) {
-                el.classList.toggle('activo');
-            }
+        function cargarHistorialArchivadoOficial() {
+            if (refArchivadosActual) refArchivadosActual.off();
+            refArchivadosActual = db.ref(`historial_recorridos/${complejoOficial}`);
+            refArchivadosActual.on('value', (snapshot) => {
+                if (rolActivo === "oficial") {
+                    renderizarAcordeones(snapshot, "contenedor-acordeon-oficial");
+                }
+            });
+        }
+
+        function cargarHistorialArchivadoMonitor(idContenedor) {
+            if (refArchivadosActual) refArchivadosActual.off();
+            refArchivadosActual = db.ref(`historial_recorridos/${complejoMonitor}`);
+            refArchivadosActual.on('value', (snapshot) => {
+                renderizarAcordeones(snapshot, idContenedor);
+            });
+        }
+
+        function limpiarHistorialComplejoActual() {
+            if (rolActivo !== "superadmin") return;
+            const nombreComp = NOMBRES_COMPLEJOS[complejoMonitor];
+            const confirmar = confirm(`¿Estás seguro de eliminar TODO el historial guardado de ${nombreComp}? Esta acción no se puede deshacer.`);
+            if (!confirmar) return;
+
+            db.ref(`historial_recorridos/${complejoMonitor}`).remove();
+            alert(`Historial de ${nombreComp} eliminado correctamente.`);
         }
     </script>
 </body>
