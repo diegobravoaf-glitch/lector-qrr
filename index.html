@@ -427,9 +427,22 @@
             valencia: "Valencia"
         };
 
+        // ================= GENERADOR DE CORRELATIVOS =================
+        function generarPuntosCorrelativos(prefijo, cantidad) {
+            const lista = [];
+            const anchoDigitos = String(cantidad).length;
+            for (let i = 1; i <= cantidad; i++) {
+                const numeroFormateado = String(i).padStart(anchoDigitos, "0");
+                lista.push(`${prefijo} - PUNTO ${numeroFormateado}`);
+            }
+            return lista;
+        }
+
         // ================= PUNTOS POR COMPLEJO =================
-        // Caracas usa tu secuencia exacta de 31 puntos.
-        // Edita los arreglos de moron, zulia y valencia con los puntos exactos de cada complejo.
+        // Caracas: 31 puntos originales
+        // Valencia: PUNTO 01 al PUNTO 80
+        // Morón: PUNTO 01 al PUNTO 120
+        // Zulia: PUNTO 01 al PUNTO 200
         const PUNTOS_POR_COMPLEJO = {
             caracas: [
                 "AZOTEA",
@@ -464,21 +477,9 @@
                 "SOTANO 01 PLATA ELECTRICA",
                 "RAMPA 01"
             ],
-            moron: [
-                "PUNTO MORON 1",
-                "PUNTO MORON 2",
-                "PUNTO MORON 3"
-            ],
-            zulia: [
-                "PUNTO ZULIA 1",
-                "PUNTO ZULIA 2",
-                "PUNTO ZULIA 3"
-            ],
-            valencia: [
-                "PUNTO VALENCIA 1",
-                "PUNTO VALENCIA 2",
-                "PUNTO VALENCIA 3"
-            ]
+            valencia: generarPuntosCorrelativos("VALENCIA", 80),
+            moron: generarPuntosCorrelativos("MORON", 120),
+            zulia: generarPuntosCorrelativos("ZULIA", 200)
         };
 
         // ================= USUARIOS Y ROLES =================
